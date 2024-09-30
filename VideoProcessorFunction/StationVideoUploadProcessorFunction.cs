@@ -44,7 +44,7 @@ namespace VideoProcessorFunction
         [FunctionName("TestEnpsConnectivity")]
         public static async Task EnpsConnectivityTest([HttpTrigger(authLevel:AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req, ILogger log)
         {
-            string messageId = "";
+            /*string messageId = "";
             using (SHA256 sha256 = SHA256.Create())
             {
                 byte[] hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(slug));
@@ -67,9 +67,9 @@ namespace VideoProcessorFunction
             string videoTimestamp = DateTime.Now.ToString();
             await CreateEnpsXmlDocument(topics, keywords, slug, mosXml, fromStation, fromPerson, videoTimestamp);
 
-            //await ProcessBlobTrigger("00a3e170-07f2-42ca-856c-ee8c93803f82Proxymp4.mp4", log);
+            //await ProcessBlobTrigger("00a3e170-07f2-42ca-856c-ee8c93803f82Proxymp4.mp4", log);*/
 
-            /*EnpsUtility enpsUtility = new EnpsUtility();
+            EnpsUtility enpsUtility = new EnpsUtility();
 
             log.LogInformation("Attempting to log into ENPS Server on VM...");
 
@@ -86,14 +86,11 @@ namespace VideoProcessorFunction
 
             CreateEnpsXmlDocument("test topics", "test keywords", slug, mosXml, "wesh", fromPerson, videoTimestamp);
 
-
             TimeZoneInfo easternZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
             
             // testing current EST
             DateTime storyModifiedDate = TimeZoneInfo.ConvertTimeFromUtc(enpsUtility.StoryDateTime, easternZone);
-            DateTime currentEstTime = TimeZoneInfo.ConvertTime(new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day), easternZone);
-
-            
+            DateTime currentEstTime = TimeZoneInfo.ConvertTime(new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day), easternZone);            
 
             // get the current time minus the specified threshold and blob created time in EST
             DateTime currentTimeMinusTenMinutesEst = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow.AddMinutes(-TIME_THRESHOLD), easternZone);
@@ -107,7 +104,7 @@ namespace VideoProcessorFunction
 
             log.LogInformation($"Video not found in ENPS, is not a PKR, or was modified/published more than a day ago. (Current date: {currentEstTime} - Story Modified Date: {storyModifiedDate.ToString()})");
 
-            log.LogInformation("Done ENPS login");*/
+            log.LogInformation("Done ENPS login");
         }        
 
         /// <summary>
