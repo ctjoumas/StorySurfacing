@@ -1,0 +1,14 @@
+﻿################################################################################
+# This .gitignore file was automatically created by Microsoft(R) Visual Studio.
+################################################################################
+
+/.vs/StorySurfacing/CopilotIndices/0.2.1648.49400/CodeChunks.db-shm
+/.vs/StorySurfacing/CopilotIndices/0.2.1648.49400/CodeChunks.db-wal
+/.vs/StorySurfacing/CopilotIndices/0.2.1648.49400/SemanticSymbols.db-shm
+/.vs/StorySurfacing/CopilotIndices/0.2.1648.49400/SemanticSymbols.db-wal
+*.v2
+*.vsidx
+*.wsuo
+/.vs/StorySurfacing/v17/DocumentLayout.backup.json
+/.vs/StorySurfacing/v17/DocumentLayout.json
+*.suo
