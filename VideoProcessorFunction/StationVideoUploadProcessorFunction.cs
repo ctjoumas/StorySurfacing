@@ -37,7 +37,7 @@ namespace VideoProcessorFunction
         //private static HttpClient client = new HttpClient(new HttpClientHandler { AllowAutoRedirect = false } );
 
         // Connection string to the storage account
-        private static string StorageAccountConnectionString = Environment.GetEnvironmentVariable("AzureWebJobsStorage");
+        private static string StorageAccountConnectionString = Environment.GetEnvironmentVariable("StorageConnectionString");
 
         private static string StationAContainerName = Environment.GetEnvironmentVariable("StationAContainerName");
 
