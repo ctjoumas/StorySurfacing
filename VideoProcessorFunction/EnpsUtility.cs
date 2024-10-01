@@ -89,7 +89,7 @@
 
             HttpResponseMessage response = await client.PostAsync(EnpsApiBaseUrl + "/Logon", content);
 
-            log.LogInformation("Request to Logon endpoit sent.");
+            log.LogInformation("Request to Logon endpoint sent.");
             log.LogInformation($"Status code: {response.StatusCode}");
 
             var contentString = await response.Content.ReadAsStringAsync();

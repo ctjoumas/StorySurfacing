@@ -44,68 +44,28 @@ namespace VideoProcessorFunction
         [FunctionName("TestEnpsConnectivity")]
         public static async Task EnpsConnectivityTest([HttpTrigger(authLevel:AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req, ILogger log)
         {
-            /*string messageId = "";
-            using (SHA256 sha256 = SHA256.Create())
-            {
-                byte[] hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(slug));
-                string hexDigest = BitConverter.ToString(hashBytes).Replace("-", "").ToLower();
-                messageId = hexDigest.Substring(0, 7);
-            }
-
-            // create the XML document that will feed back into ENPS
-            string topics = "searchServiceUtility.Topics";
-            string keywords = "searchServiceUtility.Keywords";
-            //string slug = enpsUtility.Slug;
-            string slug = "slug";
-            //string mosXml = enpsUtility.MediaObject;
-            //string mosXml = "<mos>\r\n      <itemID>2</itemID>\r\n      <itemSlug>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</itemSlug>\r\n      <objID>fae8d129-2374-4aa3-bfa0-51532fbc076c</objID>\r\n      <mosID>BC.PRECIS2.WESH.HEARST.MOS</mosID>\r\n      <mosAbstract>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</mosAbstract>\r\n      <abstract>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</abstract>\r\n      <objDur>5580</objDur>\r\n      <objTB>60</objTB>\r\n      <objSlug>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</objSlug>\r\n      <objType>VIDEO</objType>\r\n      <objPaths>\r\n        <objPath>https://WESH-CONT1.companynet.org:10456/broadcast/fae8d129-2374-4aa3-bfa0-51532fbc076c.mxf</objPath>\r\n        <objProxyPath techDescription=\"Proxy\">https://WESH-CONT1.companynet.org:10456/proxy/fae8d129-2374-4aa3-bfa0-51532fbc076cProxy.mp4</objProxyPath>\r\n        <objProxyPath techDescription=\"JPG\">https://WESH-CONT1.companynet.org:10456/still/fae8d129-2374-4aa3-bfa0-51532fbc076c.jpg</objProxyPath>\r\n      </objPaths>\r\n      <mosExternalMetadata>\r\n        <mosScope>STORY</mosScope>\r\n        <mosSchema>http://bitcentral.com/schemas/mos/2.0</mosSchema>\r\n        <mosPayload />\r\n      </mosExternalMetadata>\r\n      <itemChannel>X</itemChannel>\r\n      <objAir>NOT READY</objAir>\r\n    </mos>";
-            string mosXml = @"[<mos><itemID>2</itemID><itemSlug>4 MCD BEARS SELF DEFENSE BILL-PKG</itemSlug><objID>8d863999-dffe-4fa6-8ffb-1dd9fe032048</objID><mosID>BC.PRECIS1.WESH.HEARST.MOS</mosID><mosAbstract>4 MCD BEARS SELF DEFENSE BILL-PKG_WESH-NEWS-WSE2X_lblanck_20240624_155046.mxf</mosAbstract><abstract>4 MCD BEARS SELF DEFENSE BILL-PKG_WESH-NEWS-WSE2X_lblanck_20240624_155046.mxf</abstract><objDur>6600</objDur><objTB>60</objTB><objSlug>4 MCD BEARS SELF DEFENSE BILL-PKG_WESH-NEWS-WSE2X_lblanck_20240624_155046.mxf</objSlug><objPaths><objPath>https://WESH-Precis.CompanyNet.org:10456/broadcast/8d863999-dffe-4fa6-8ffb-1dd9fe032048.mxf</objPath><objProxyPath techDescription=""Proxy"">https://WESH-Precis.CompanyNet.org:10456/proxy/8d863999-dffe-4fa6-8ffb-1dd9fe032048Proxy.mp4</objProxyPath><objProxyPath techDescription=""JPG"">https://WESH-Precis.CompanyNet.org:10456/still/8d863999-dffe-4fa6-8ffb-1dd9fe032048.jpg</objProxyPath></objPaths><mosExternalMetadata><mosScope>STORY</mosScope><mosSchema>http://bitcentral.com/schemas/mos/2.0</mosSchema><mosPayload /></mosExternalMetadata><objType>VIDEO</objType><itemChannel>X</itemChannel><objAir>NOT READY</objAir></mos>]";
-            string fromStation = "wesh";
-            //string fromPerson = enpsUtility.FromPerson;
-            string fromPerson = "from Person";
-            //string videoTimestamp = enpsUtility.VideoTimestamp;
-            string videoTimestamp = DateTime.Now.ToString();
-            await CreateEnpsXmlDocument(topics, keywords, slug, mosXml, fromStation, fromPerson, videoTimestamp);
-
-            //await ProcessBlobTrigger("00a3e170-07f2-42ca-856c-ee8c93803f82Proxymp4.mp4", log);*/
-
             EnpsUtility enpsUtility = new EnpsUtility();
 
             log.LogInformation("Attempting to log into ENPS Server on VM...");
 
             await enpsUtility.Login(log);
 
-            // call search to populate ENPS Video Path, which will tell us if it's a story as well as a PKG
-            bool isStoryAndPkg = await enpsUtility.Search("fae8d129-2374-4aa3-bfa0-51532fbc076cProxy.mp4", log);
-            await enpsUtility.GetBasicContent(log);
-
-            string slug = enpsUtility.Slug;
-            string mosXml = enpsUtility.MediaObject;
-            string fromPerson = enpsUtility.FromPerson;
-            string videoTimestamp = enpsUtility.VideoTimestamp;
-
-            CreateEnpsXmlDocument("test topics", "test keywords", slug, mosXml, "wesh", fromPerson, videoTimestamp);
-
-            TimeZoneInfo easternZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
-            
-            // testing current EST
-            DateTime storyModifiedDate = TimeZoneInfo.ConvertTimeFromUtc(enpsUtility.StoryDateTime, easternZone);
-            DateTime currentEstTime = TimeZoneInfo.ConvertTime(new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day), easternZone);            
-
-            // get the current time minus the specified threshold and blob created time in EST
-            DateTime currentTimeMinusTenMinutesEst = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow.AddMinutes(-TIME_THRESHOLD), easternZone);
-            //DateTime blobCreatedDateTimeEst = TimeZoneInfo.ConvertTimeFromUtc(DateTime.Now, easternZone);
-            DateTime blobCreatedDateTimeEst = TimeZoneInfo.ConvertTime(new DateTime(2023, 9, 20), easternZone);
-
-            if (storyModifiedDate >= blobCreatedDateTimeEst)
-            {
-                Console.WriteLine("Index Story!");
-            }
-
-            log.LogInformation($"Video not found in ENPS, is not a PKR, or was modified/published more than a day ago. (Current date: {currentEstTime} - Story Modified Date: {storyModifiedDate.ToString()})");
-
             log.LogInformation("Done ENPS login");
-        }        
+        }
+
+        /// <summary>
+        /// Endpoint for testing the indexing of a video. If testing a video which exists in ENPS and in VI, the processing state and video ID can be supplied
+        /// as query parameters.
+        /// </summary>
+        /// <param name="req"></param>
+        /// <param name="log"></param>
+        /// <returns></returns>
+        [FunctionName("TestIndexVideo")]
+        public static async Task IndexVideoTest([HttpTrigger(authLevel: AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req, ILogger log)
+        {
+            //await IndexVideoMetadata(req.Query["state"], req.Query["id"], log);
+            await ProcessVideo(req.Query["state"], req.Query["id"], log);
+        }
 
         /// <summary>
         /// This is the callback URL that Video Indexer posts to where we can get the Video ID. We use this in order to avoid having
@@ -123,10 +83,13 @@ namespace VideoProcessorFunction
             // If video is processed
             if (req.Query["state"].Equals(ProcessingState.Processed.ToString()))
             {
-                await IndexVideoMetadata(req.Query["state"], req.Query["id"], log);
+                //await IndexVideoMetadata(req.Query["state"], req.Query["id"], log);
+                await ProcessVideo(req.Query["state"], req.Query["id"], log);
             }
             else if (req.Query["state"].Equals(ProcessingState.Failed.ToString()))
             {
+                // TODO: Add code here to remove video name entry from Cosmos DB as this failed processing
+
                 log.LogInformation($"\nThe video index failed for video ID {req.Query["id"]}.");
             }
         }
@@ -138,13 +101,9 @@ namespace VideoProcessorFunction
             // the database so when videos are pulled up from trend search results, it will have the path to the video on the ENPS
             // server as well as the overview text of the video, including any possible network affiliation if an anchor's name
             // exists in the overview text
-            /* COMMENTING OUT FOR TESTING WITHOUT ENPS SERVER
             EnpsUtility enpsUtility = new EnpsUtility();
             await enpsUtility.Login(log);
-            bool processVideo = await enpsUtility.Search(name, log);*/
-
-            // TESTING GETTING FUNCTION CALLBACK URL
-            bool processVideo = true;
+            bool processVideo = await enpsUtility.Search(name, log);
 
             // if this video is found to be a story and a PKG, we'll process it
             if (processVideo)
@@ -164,6 +123,8 @@ namespace VideoProcessorFunction
                 else
                 {
                     log.LogInformation($"Blob trigger function for Station A processed blob\n Name: {name} from path: {uri}.");
+
+                    // TODO: Add code to add this video name and station (StationA, which we'll change to WESH later) to Cosmos DB
 
                     await ProcessBlobTrigger(name, log);
                 }
@@ -343,6 +304,112 @@ namespace VideoProcessorFunction
             }
         }
 
+        /// <summary>
+        /// Once a video is determined to be a PKG and published within the threshold (i.e. 24 hours), we will process the video
+        /// by saving the topics into the cosmos db and then creating the XML document which will be uploaded to an FTP server
+        /// for processing.
+        /// </summary>
+        /// <returns></returns>
+        private static async Task ProcessVideo(string processingState, string videoId, ILogger log)
+        {
+            // we don't have the video name and will need to get it from Video Indexer, so let's do that first
+            // Build Azure Video Indexer resource provider client that has access token throuhg ARM
+            var videoIndexerResourceProviderClient = await VideoIndexerResourceProviderClient.BuildVideoIndexerResourceProviderClient();
+
+            // Get account details
+            var account = await videoIndexerResourceProviderClient.GetAccount(log);
+            var accountLocation = account.Location;
+            var accountId = account.Properties.Id;
+
+            // Get account level access token for Azure Video Indexer 
+            var accountAccessToken = await videoIndexerResourceProviderClient.GetAccessToken(ArmAccessTokenPermission.Contributor, ArmAccessTokenScope.Account, log);
+
+            string queryParams = CreateQueryString(
+                new Dictionary<string, string>()
+                {
+                    { "accessToken", accountAccessToken },
+                    { "language", "English" },
+                });
+
+            // Create the http client in order to get the JSON Insights of the video
+            var handler = new HttpClientHandler
+            {
+                AllowAutoRedirect = false
+            };
+
+            var client = new HttpClient(handler);
+
+            var videoGetIndexRequestResult = await client.GetAsync($"{ApiUrl}/{accountLocation}/Accounts/{accountId}/Videos/{videoId}/Index?{queryParams}");
+
+            VerifyStatus(videoGetIndexRequestResult, System.Net.HttpStatusCode.OK);
+
+            var videoGetIndexResult = await videoGetIndexRequestResult.Content.ReadAsStringAsync();
+
+            string videoName = System.Text.Json.JsonSerializer.Deserialize<Video>(videoGetIndexResult).Name;
+
+            log.LogInformation($"Here is the full JSON of the indexed video for video ID {videoId}: \n{videoGetIndexResult}");
+
+            // when the video was first processed by the RunStationAVideo trigger, we checked ENPS to ensure this video is a PKG but we
+            // still need to use the ENPS client to return back the pieces of information we need to include in
+            // the XML file which include the path to the video on the ENPS server as well as the overview text of the video, including
+            // any possible network affiliation (future) if an anchor's name exists in the overview text
+            EnpsUtility enpsUtility = new EnpsUtility();
+            await enpsUtility.Login(log);
+
+            // testing - remove after testing
+            string videoNameTest = System.Text.Json.JsonSerializer.Deserialize<Video>(videoGetIndexResult).Name;
+
+            // call search to populate ENPS Video Path, slug, and other pieces of information needed for the XML file
+            await enpsUtility.Search(videoName, log);
+
+            DateTime storyModifiedDate = enpsUtility.StoryDateTime;
+
+            // calls the ENPS BasicContent endpoint which will get the text overview of the video
+            await enpsUtility.GetBasicContent(log);
+
+            // ask GPT-4 to see if a name is embedded in the video overview text and return any network affiliation
+            // COMMENTING OUT FOR TESTING WITHOUT ENPS SERVER
+            //PersonNetworkAffiliationUtility personNetworkAffiliationUtility = new PersonNetworkAffiliationUtility();
+            //string possibleNetworkAffiliation = await personNetworkAffiliationUtility.SearchNetworkAffiliationUsingChatGpt4(enpsUtility.VideoOverviewText);*/
+            string possibleNetworkAffiliation = "NBC";
+
+            // once the video is processed, we no longer need it in the storage account - TODO: ADD CONTAINER NAME FOR VIDEOS TO APP CONFIG
+            BlobClient blobClient = new BlobClient(StorageAccountConnectionString, "station-a", videoName);
+            if (blobClient.Exists())
+            {
+                await blobClient.DeleteAsync();
+            }
+
+            log.LogInformation($"Video {videoName} deleted from storage account.");
+
+            // Now that we have the full JSON from Video Indexer, extract the topics and keywords for the XML file
+            videoIndexerResourceProviderClient.ProcessMetadata(videoGetIndexResult, log);
+
+            // TODO: Add code to update the entry in Cosmos DB for this video with the topics
+
+            // create the XML document that will feed back into ENPS
+            string topics = videoIndexerResourceProviderClient.Topics;
+            string keywords = videoIndexerResourceProviderClient.Keywords;
+            string slug = enpsUtility.Slug;
+            //string slug = "slug";
+            string mosXml = enpsUtility.MediaObject;
+            //string mosXml = "<mos><itemID>2</itemID><itemSlug>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</itemSlug><objID>fae8d129-2374-4aa3-bfa0-51532fbc076c</objID><mosID>BC.PRECIS2.WESH.HEARST.MOS</mosID><mosAbstract>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</mosAbstract><abstract>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</abstract><objDur>5580</objDur><objTB>60</objTB><objSlug>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</objSlug><objType>VIDEO</objType><objPaths><objPath>https://WESH-CONT1.companynet.org:10456/broadcast/fae8d129-2374-4aa3-bfa0-51532fbc076c.mxf</objPath><objProxyPath techDescription=\"Proxy\">https://WESH-CONT1.companynet.org:10456/proxy/fae8d129-2374-4aa3-bfa0-51532fbc076cProxy.mp4</objProxyPath><objProxyPath techDescription=\"JPG\">https://WESH-CONT1.companynet.org:10456/still/fae8d129-2374-4aa3-bfa0-51532fbc076c.jpg</objProxyPath></objPaths><mosExternalMetadata><mosScope>STORY</mosScope><mosSchema>http://bitcentral.com/schemas/mos/2.0</mosSchema><mosPayload /></mosExternalMetadata><itemChannel>X</itemChannel><objAir>NOT READY</objAir></mos>";
+            string fromStation = "wesh";
+            string fromPerson = enpsUtility.FromPerson;
+            //string fromPerson = "from Person";
+            string videoTimestamp = enpsUtility.VideoTimestamp;
+            //string videoTimestamp = DateTime.Now.ToString();
+            await CreateEnpsXmlDocument(topics, keywords, slug, mosXml, fromStation, fromPerson, videoTimestamp);
+        }
+
+        /// <summary>
+        /// THIS PREVIOUSLY INDEXED THE VIDEO METADATA INTO THE COGNITIVE SEARCH INDEX VECTOR STORE, BUT NOW WILL
+        /// BE REPLACED WITH THE ABOVE "ProcessVideo" METHOD TO ONLY STORE TOPICS OF THE VIDEO.
+        /// </summary>
+        /// <param name="processingState"></param>
+        /// <param name="videoId"></param>
+        /// <param name="log"></param>
+        /// <returns></returns>
         private static async Task IndexVideoMetadata(string processingState, string videoId, ILogger log)
         {
             // we don't have the video name and will need to get it from Video Indexer, so let's do that first
@@ -385,26 +452,24 @@ namespace VideoProcessorFunction
             // the database so when videos are pulled up from trend search results, it will have the path to the video on the ENPS
             // server as well as the overview text of the video, including any possible network affiliation if an anchor's name
             // exists in the overview text
-            // UNCOMMENT TO TEST LOCALLY WITH ENPS SERVER
-            /*EnpsUtility enpsUtility = new EnpsUtility();
-            await enpsUtility.Login(log);*/
+            EnpsUtility enpsUtility = new EnpsUtility();
+            await enpsUtility.Login(log);
             
             string videoName = System.Text.Json.JsonSerializer.Deserialize<Video>(videoGetIndexResult).Name;
 
             // call search to populate ENPS Video Path, which will tell us if it's a story as well as a PKG
-            /*bool isStoryAndPkg = await enpsUtility.Search(videoName, log);
+            bool isStoryAndPkg = await enpsUtility.Search(videoName, log);
 
-            DateTime storyModifiedDate = enpsUtility.StoryDateTime;*/
+            DateTime storyModifiedDate = enpsUtility.StoryDateTime;
 
             TimeZoneInfo easternZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
             DateTime currentDateEst = TimeZoneInfo.ConvertTime(DateTime.Now, easternZone);
 
             // only process the video if it's a story and a PKG and the date is the same as today's date since we do not want older stories
-            //if (isStoryAndPkg && storyModifiedDate >= currentDateEst)
-            if (true)
+            if (isStoryAndPkg && storyModifiedDate >= currentDateEst)
             {
                 // calls the ENPS BasicContent endpoint which will get the text overview of the video
-                //await enpsUtility.GetBasicContent(log);
+                await enpsUtility.GetBasicContent(log);
 
                 // ask GPT-4 to see if a name is embedded in the video overview text and return any network affiliation
                 // COMMENTING OUT FOR TESTING WITHOUT ENPS SERVER
@@ -423,21 +488,21 @@ namespace VideoProcessorFunction
 
                 // Now that we have the full JSON from Video Indexer, we are going to index this into our Cognitive Search index vector store
                 SearchServiceUtility searchServiceUtility = new SearchServiceUtility();
-                //await searchServiceUtility.IndexVideoMetadata(videoGetIndexResult, enpsUtility.VideoPath, enpsUtility.VideoOverviewText, possibleNetworkAffiliation, log);
-                await searchServiceUtility.IndexVideoMetadata(videoGetIndexResult, "ENPS/Video/Path", "This is the overview video text which will be taken from ENPS", possibleNetworkAffiliation, log);
+                await searchServiceUtility.IndexVideoMetadata(videoGetIndexResult, enpsUtility.VideoPath, enpsUtility.VideoOverviewText, possibleNetworkAffiliation, log);
+                //await searchServiceUtility.IndexVideoMetadata(videoGetIndexResult, "ENPS/Video/Path", "This is the overview video text which will be taken from ENPS", possibleNetworkAffiliation, log);
 
                 // create the XML document that will feed back into ENPS
                 string topics = searchServiceUtility.Topics;
                 string keywords = searchServiceUtility.Keywords;
-                //string slug = enpsUtility.Slug;
-                string slug = "slug";
-                //string mosXml = enpsUtility.MediaObject;
-                string mosXml = "<mos><itemID>2</itemID><itemSlug>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</itemSlug><objID>fae8d129-2374-4aa3-bfa0-51532fbc076c</objID><mosID>BC.PRECIS2.WESH.HEARST.MOS</mosID><mosAbstract>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</mosAbstract><abstract>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</abstract><objDur>5580</objDur><objTB>60</objTB><objSlug>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</objSlug><objType>VIDEO</objType><objPaths><objPath>https://WESH-CONT1.companynet.org:10456/broadcast/fae8d129-2374-4aa3-bfa0-51532fbc076c.mxf</objPath><objProxyPath techDescription=\"Proxy\">https://WESH-CONT1.companynet.org:10456/proxy/fae8d129-2374-4aa3-bfa0-51532fbc076cProxy.mp4</objProxyPath><objProxyPath techDescription=\"JPG\">https://WESH-CONT1.companynet.org:10456/still/fae8d129-2374-4aa3-bfa0-51532fbc076c.jpg</objProxyPath></objPaths><mosExternalMetadata><mosScope>STORY</mosScope><mosSchema>http://bitcentral.com/schemas/mos/2.0</mosSchema><mosPayload /></mosExternalMetadata><itemChannel>X</itemChannel><objAir>NOT READY</objAir></mos>";
+                string slug = enpsUtility.Slug;
+                //string slug = "slug";
+                string mosXml = enpsUtility.MediaObject;
+                //string mosXml = "<mos><itemID>2</itemID><itemSlug>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</itemSlug><objID>fae8d129-2374-4aa3-bfa0-51532fbc076c</objID><mosID>BC.PRECIS2.WESH.HEARST.MOS</mosID><mosAbstract>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</mosAbstract><abstract>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</abstract><objDur>5580</objDur><objTB>60</objTB><objSlug>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</objSlug><objType>VIDEO</objType><objPaths><objPath>https://WESH-CONT1.companynet.org:10456/broadcast/fae8d129-2374-4aa3-bfa0-51532fbc076c.mxf</objPath><objProxyPath techDescription=\"Proxy\">https://WESH-CONT1.companynet.org:10456/proxy/fae8d129-2374-4aa3-bfa0-51532fbc076cProxy.mp4</objProxyPath><objProxyPath techDescription=\"JPG\">https://WESH-CONT1.companynet.org:10456/still/fae8d129-2374-4aa3-bfa0-51532fbc076c.jpg</objProxyPath></objPaths><mosExternalMetadata><mosScope>STORY</mosScope><mosSchema>http://bitcentral.com/schemas/mos/2.0</mosSchema><mosPayload /></mosExternalMetadata><itemChannel>X</itemChannel><objAir>NOT READY</objAir></mos>";
                 string fromStation = "wesh";
-                //string fromPerson = enpsUtility.FromPerson;
-                string fromPerson = "from Person";
-                //string videoTimestamp = enpsUtility.VideoTimestamp;
-                string videoTimestamp = DateTime.Now.ToString();
+                string fromPerson = enpsUtility.FromPerson;
+                //string fromPerson = "from Person";
+                string videoTimestamp = enpsUtility.VideoTimestamp;
+                //string videoTimestamp = DateTime.Now.ToString();
                 await CreateEnpsXmlDocument(topics, keywords, slug, mosXml, fromStation, fromPerson, videoTimestamp);
             }
         }
@@ -530,6 +595,8 @@ namespace VideoProcessorFunction
             newNode = doc.CreateElement("keywords");
             newNode.InnerText = keywords;
             rootNode.AppendChild(newNode);
+
+            // AI topic comparison to each station AI index
 
             // this is hardcoded now for WESH, but this will be updated in the future to account for other stations
             // based on their location and the area of interest / location of the story

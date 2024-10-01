@@ -9,6 +9,7 @@
     using System.Threading.Tasks;
     using System.Text.Json.Serialization;
     using Microsoft.Extensions.Logging;
+    using Newtonsoft.Json.Linq;
 
     internal class VideoIndexerResourceProviderClient
     {
@@ -18,6 +19,9 @@
         private string SubscriptionId = Environment.GetEnvironmentVariable("SubscriptionId");
         private string AccountName = Environment.GetEnvironmentVariable("AccountName");
         private readonly string armAccessToken;
+
+        public string Topics { get; set; }
+        public string Keywords { get; set; }
 
         /// <summary>
         /// Builds the Video Indexer Resource Provider Client with the proper token for authorization.
@@ -113,6 +117,96 @@
                 log.LogInformation(ex.ToString());
                 throw;
             }
+        }
+
+        public void ProcessMetadata(string videoMetadataJson, ILogger log)
+        {
+            JObject videoIndexerJsonObject = JObject.Parse(videoMetadataJson);
+
+            // Grab name of video and it's ID so it can be added to cognitive search document for each entry / document
+            //string videoName = videoIndexerJsonObject.SelectToken("name").ToString();
+            //string videoId = videoIndexerJsonObject.SelectToken("videos[0].id").ToString();
+
+            /*
+               Create one single text vector to include:
+               [Video context]
+               Topics of this video are: Politics, Sports
+               Celebrities appearing in this video: LeBron James, MJ
+               OCR: MUSEUM, 
+               Transcript: ...
+             */
+
+            StringBuilder sbTextVector = new StringBuilder();
+
+            // We are going to create embeddings from topics, labels, keywords, and faces
+            string topics = GetMetadataFromVideoIndexer(videoIndexerJsonObject, "topics", "name");
+            if (topics.Length > 0)
+            {
+                sbTextVector.Append("Topics of this video are: ");
+                sbTextVector.Append(topics);
+
+                Topics += sbTextVector.ToString();
+            }
+
+            string faces = GetMetadataFromVideoIndexer(videoIndexerJsonObject, "faces", "name");
+            if (faces.Length > 0)
+            {
+                sbTextVector.Append("Celebrities appearing in this video: ");
+                sbTextVector.Append(faces);
+
+                Keywords += sbTextVector.ToString();
+            }
+
+            string keywords = GetMetadataFromVideoIndexer(videoIndexerJsonObject, "keywords", "name");
+            if (keywords.Length > 0)
+            {
+                Keywords += sbTextVector.ToString();
+            }
+
+            string ocr = GetMetadataFromVideoIndexer(videoIndexerJsonObject, "ocr", "text");
+            if (ocr.Length > 0)
+            {
+                sbTextVector.Append("OCR: ");
+                sbTextVector.Append(ocr);
+            }
+
+            string transcript = GetMetadataFromVideoIndexer(videoIndexerJsonObject, "transcript", "text");
+            if (transcript.Length > 0)
+            {
+                sbTextVector.Append("Transcript: ");
+                sbTextVector.Append(transcript);
+            }
+        }
+
+        /// <summary>
+        /// Pull out each metadata type in the Video Indexer JSON and concatenates it in a spaced string. E.g., for
+        /// topics metadata, we would return something like "Music Entertainment Songs"
+        /// </summary>
+        /// <param name="videoIndexerJsonObject">The Video Indexer JSON</param>
+        /// <param name="metadataType">The metadata type we are pulling from the JSON</param>
+        /// <param name="metadataField">The name of the metadata type we are interested in</param>
+        /// <returns>The metadata type data, separated by spaces</returns>
+        private string GetMetadataFromVideoIndexer(JObject videoIndexerJsonObject, string metadataType, string metadataField)
+        {
+            StringBuilder sbMetadataType = new StringBuilder();
+            JToken metadataTypeTokens = videoIndexerJsonObject.SelectToken($"videos[0].insights.{metadataType}");
+
+            if (metadataTypeTokens != null)
+            {
+                foreach (var metadataTypeToken in metadataTypeTokens)
+                {
+                    // if we are not looking for recognized faces or we are looking for recognized faces and the face
+                    // is a known person, add the data
+                    if (!metadataType.Equals("faces") ||
+                        (metadataType.Equals("faces") && !metadataTypeToken[metadataField].ToString().Contains("Unknown")))
+                    {
+                        sbMetadataType.Append(metadataTypeToken[metadataField]);
+                        sbMetadataType.Append(" ");
+                    }
+                }
+            }
+
+            return sbMetadataType.ToString();
         }
 
         private void VerifyValidAccount(Account account, ILogger log)
