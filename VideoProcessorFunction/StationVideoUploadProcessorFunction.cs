@@ -124,7 +124,7 @@ namespace VideoProcessorFunction
                 {
                     log.LogInformation($"Blob trigger function for Station A processed blob\n Name: {name} from path: {uri}.");
 
-                    // TODO: Add code to add this video name and station (StationA, which we'll change to WESH later) to Cosmos DB
+                    // TODO: Create a record in CosmosDB - StationName [PartiionKey], VideoName, VideoId, StoryDateTime (from enps)
 
                     await ProcessBlobTrigger(name, log);
                 }
@@ -385,7 +385,7 @@ namespace VideoProcessorFunction
             // Now that we have the full JSON from Video Indexer, extract the topics and keywords for the XML file
             videoIndexerResourceProviderClient.ProcessMetadata(videoGetIndexResult, log);
 
-            // TODO: Add code to update the entry in Cosmos DB for this video with the topics
+            // TODO: Add code to update the entry in Cosmos DB for this video with the topics. Save Topics to Cosmos DB. Update Cosmos DB entry with Topics for existing video.
 
             // create the XML document that will feed back into ENPS
             string topics = videoIndexerResourceProviderClient.Topics;
