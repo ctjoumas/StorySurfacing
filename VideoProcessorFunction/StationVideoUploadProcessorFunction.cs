@@ -95,7 +95,7 @@ namespace VideoProcessorFunction
         }
 
         [FunctionName("StationAVideoUploadTrigger")]
-        public static async Task RunStationAVideo([BlobTrigger("station-a/{name}", Connection = "AzureWebJobsStorage")] Stream videoBlob, string name, Uri uri, ILogger log, BlobProperties properties)
+        public static async Task RunStationAVideo([BlobTrigger("station-a/{name}", Connection = "StorageConnectionString")] Stream videoBlob, string name, Uri uri, ILogger log, BlobProperties properties)
         {
             // we first need to check ENPS to ensure this is a PKG and return back the pieces of information we need to include in
             // the database so when videos are pulled up from trend search results, it will have the path to the video on the ENPS
