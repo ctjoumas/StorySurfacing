@@ -34,6 +34,7 @@
 
             return new VideoIndexerResourceProviderClient(tokenRequestResult.Token);
         }
+
         public VideoIndexerResourceProviderClient(string armAaccessToken)
         {
             this.armAccessToken = armAaccessToken;
