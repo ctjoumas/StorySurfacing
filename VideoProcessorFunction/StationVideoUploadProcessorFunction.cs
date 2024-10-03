@@ -23,7 +23,11 @@ namespace VideoProcessorFunction
     using System.Text;
     using System.Globalization;
     using CoreFtp;
-    
+    using VideoProcessorFunction.Models;
+    using VideoProcessorFunction.Services;
+    using System.Linq;
+    using Newtonsoft.Json;
+
     public static class StationVideoUploadProcessorFunction
     {
         private const string AzureResourceManager = "https://management.azure.com";
@@ -88,14 +92,21 @@ namespace VideoProcessorFunction
             }
             else if (req.Query["state"].Equals(ProcessingState.Failed.ToString()))
             {
-                // TODO: Add code here to remove video name entry from Cosmos DB as this failed processing
-
                 log.LogInformation($"\nThe video index failed for video ID {req.Query["id"]}.");
+                var service = new CosmosDbService<Story>();
+                var story = await service.GetItemAsync("VideoId", req.Query["id"]);
+                await service.DeleteItemAsync(story.Id, story.PartitionKey);
             }
         }
 
         [FunctionName("StationAVideoUploadTrigger")]
-        public static async Task RunStationAVideo([BlobTrigger("station-a/{name}", Connection = "StorageConnectionString")] Stream videoBlob, string name, Uri uri, ILogger log, BlobProperties properties)
+        public static async Task RunStationAVideo(
+            [BlobTrigger("station-a/{name}", 
+            Connection = "StorageConnectionString")] Stream videoBlob, 
+            string name, 
+            Uri uri, 
+            ILogger log, 
+            BlobProperties properties)
         {
             // we first need to check ENPS to ensure this is a PKG and return back the pieces of information we need to include in
             // the database so when videos are pulled up from trend search results, it will have the path to the video on the ENPS
@@ -104,7 +115,7 @@ namespace VideoProcessorFunction
             EnpsUtility enpsUtility = new EnpsUtility();
             await enpsUtility.Login(log);
             bool processVideo = await enpsUtility.Search(name, log);
-
+            
             // if this video is found to be a story and a PKG, we'll process it
             if (processVideo)
             {
@@ -124,9 +135,20 @@ namespace VideoProcessorFunction
                 {
                     log.LogInformation($"Blob trigger function for Station A processed blob\n Name: {name} from path: {uri}.");
 
-                    // TODO: Create a record in CosmosDB - StationName [PartiionKey], VideoName, VideoId, StoryDateTime (from enps)
-
                     await ProcessBlobTrigger(name, log);
+
+                    var cosmosDbService = new CosmosDbService<Story>();
+                    var station = new BlobUriBuilder(uri).BlobContainerName;
+
+                    var story = new Story
+                    {
+                        Id = Guid.NewGuid().ToString(),
+                        PartitionKey = station,
+                        VideoName = name,
+                        StoryDateTime = enpsUtility.StoryDateTime
+                    };
+
+                    await cosmosDbService.CreateItemAsync(story);
                 }
             }
 
@@ -198,9 +220,19 @@ namespace VideoProcessorFunction
 
             var content = new MultipartFormDataContent();
 
-            string functionCallbackUrl = await GetFunctionCallbackUrl();
-            //string functionCallbackUrl = "http://localhost:7270/api/GetVideoStatus";
+            var env = Environment.GetEnvironmentVariable("AZURE_FUNCTIONS_ENVIRONMENT");
 
+            var functionCallbackUrl = string.Empty;
+
+            if (env == "Development")
+            {
+                functionCallbackUrl = Environment.GetEnvironmentVariable("CallbackFunctionName");
+            }
+            else
+            {
+                functionCallbackUrl = await GetFunctionCallbackUrl();
+            }
+            
             try
             {
                 var queryParams = CreateQueryString(
@@ -385,10 +417,14 @@ namespace VideoProcessorFunction
             // Now that we have the full JSON from Video Indexer, extract the topics and keywords for the XML file
             videoIndexerResourceProviderClient.ProcessMetadata(videoGetIndexResult, log);
 
-            // TODO: Add code to update the entry in Cosmos DB for this video with the topics. Save Topics to Cosmos DB. Update Cosmos DB entry with Topics for existing video.
-
             // create the XML document that will feed back into ENPS
             string topics = videoIndexerResourceProviderClient.Topics;
+
+            if (!string.IsNullOrEmpty(topics))
+            {
+                await UpdateStationTopics(videoId, videoName, topics.Trim());
+            }
+
             string keywords = videoIndexerResourceProviderClient.Keywords;
             string slug = enpsUtility.Slug;
             //string slug = "slug";
@@ -552,6 +588,7 @@ namespace VideoProcessorFunction
             // there seem to be non-breaking spaces, specifically the character with a hex value of 0xA0, so we need to remove this
             mosXml = mosXml.Replace("\u00A0", " ");
             //mosXml = System.Text.RegularExpressions.Regex.Unescape(mosXml);
+
             try
             {
                 newNode.InnerXml = mosXml;
@@ -560,7 +597,6 @@ namespace VideoProcessorFunction
             {
                 Console.WriteLine(e.ToString());
             }
-
 
             rootNode.AppendChild(newNode);
 
@@ -607,13 +643,13 @@ namespace VideoProcessorFunction
             using (MemoryStream xmlStream = new MemoryStream())
             {
                 using (var ftpClient = new FtpClient(new FtpClientConfiguration
-                                                        {
-                                                            Host = "bncftp.ap.org",
-                                                            Username = "hearst-test",
-                                                            Password = "Fried^Pickle^Chips97",
-                                                            IgnoreCertificateErrors = true
+                {
+                    Host = "bncftp.ap.org",
+                    Username = "hearst-test",
+                    Password = "Fried^Pickle^Chips97",
+                    IgnoreCertificateErrors = true
 
-                                                        }))
+                }))
                 {
                     await ftpClient.LoginAsync();
 
@@ -636,6 +672,54 @@ namespace VideoProcessorFunction
             }
 
             return queryParameters.ToString();
+        }
+
+        static async Task<string> GetStationTopicsAsync(string excludedStation = null)
+        {
+            var service = new CosmosDbService<Story>();
+            var query = string.Empty;
+
+            if (string.IsNullOrEmpty(excludedStation))
+            {
+                query = "SELECT * FROM c";
+            }
+            else
+            {
+                query = $"SELECT * FROM c WHERE c.StationName != '{excludedStation}'";
+            }
+
+            var items = await service.QueryItemsAsync(query);
+
+            var projectedItems = items.Where(story => story.Topics != null && story.Topics.Any())
+                .Select(story => new
+                {
+                    stationName = story.PartitionKey,
+                    topics = story.Topics
+                }).ToList();
+
+            var rootObject = new
+            {
+                stationTopics = projectedItems
+            };
+
+            var json = JsonConvert.SerializeObject(rootObject, Newtonsoft.Json.Formatting.Indented);
+
+            return json;
+        }
+
+        static async Task UpdateStationTopics(string videoId, string videoName, string topics)
+        {
+            var topicsPart = topics.Split(':')[1].Trim();
+
+            List<string> topicsList = topicsPart.Split(' ')
+                                                .Select(topic => topic.Trim())
+                                                .ToList();
+            
+            var service = new CosmosDbService<Story>();
+            var story = await service.GetItemAsync("VideoName", videoName);
+            story.VideoId = videoId;
+            story.Topics = topicsList;
+            await service.UpdateItemAsync(story);
         }
     }
 
