@@ -23,7 +23,8 @@ namespace VideoProcessorFunction
     using System.Text;
     using System.Globalization;
     using CoreFtp;
-    
+    using VideoProcessorFunction.Services;
+
     public static class StationVideoUploadProcessorFunction
     {
         private const string AzureResourceManager = "https://management.azure.com";
@@ -44,6 +45,41 @@ namespace VideoProcessorFunction
         [FunctionName("TestEnpsConnectivity")]
         public static async Task EnpsConnectivityTest([HttpTrigger(authLevel:AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req, ILogger log)
         {
+            string allStationTopics = @"
+                {
+                ""stationTopics"": [
+                    {
+                        ""stationName"": ""WESH"",
+                        ""topics"": [
+                            ""Sports"",
+                            ""Weather"",
+                            ""Fishing""
+                        ]
+                    },
+                    {
+                        ""stationName"": ""NYC"",
+                        ""topics"": [
+                            ""Sports"",
+                            ""Crime"",
+                            ""Politics""
+                        ]
+                    }
+                ]
+            }
+            ";
+            string videoTopics = @"
+                {
+                    ""videoTopics"": [
+                        ""Sports"",
+                        ""Weather"",
+                        ""Fishing""
+                    ]
+                }
+            ";
+
+            AzureOpenAIService azureOpenAIService = new AzureOpenAIService();
+            var response = await azureOpenAIService.GetChatResponseWithRetryAsync(allStationTopics, videoTopics);
+
             EnpsUtility enpsUtility = new EnpsUtility();
 
             log.LogInformation("Attempting to log into ENPS Server on VM...");
@@ -101,12 +137,12 @@ namespace VideoProcessorFunction
             // the database so when videos are pulled up from trend search results, it will have the path to the video on the ENPS
             // server as well as the overview text of the video, including any possible network affiliation if an anchor's name
             // exists in the overview text
-            EnpsUtility enpsUtility = new EnpsUtility();
+            /*EnpsUtility enpsUtility = new EnpsUtility();
             await enpsUtility.Login(log);
             bool processVideo = await enpsUtility.Search(name, log);
 
             // if this video is found to be a story and a PKG, we'll process it
-            if (processVideo)
+            if (processVideo)*/
             {
                 TimeZoneInfo easternZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
 
@@ -386,6 +422,8 @@ namespace VideoProcessorFunction
             videoIndexerResourceProviderClient.ProcessMetadata(videoGetIndexResult, log);
 
             // TODO: Add code to update the entry in Cosmos DB for this video with the topics. Save Topics to Cosmos DB. Update Cosmos DB entry with Topics for existing video.
+            // This call should return the station name so we know to not pull this back when creating the XML document (we are only pulling topics from all other stations when checking "interest of")
+            string stationName = string.Empty;
 
             // create the XML document that will feed back into ENPS
             string topics = videoIndexerResourceProviderClient.Topics;
@@ -399,7 +437,7 @@ namespace VideoProcessorFunction
             //string fromPerson = "from Person";
             string videoTimestamp = enpsUtility.VideoTimestamp;
             //string videoTimestamp = DateTime.Now.ToString();
-            await CreateEnpsXmlDocument(topics, keywords, slug, mosXml, fromStation, fromPerson, videoTimestamp);
+            await CreateEnpsXmlDocument(stationName, topics, keywords, slug, mosXml, fromStation, fromPerson, videoTimestamp);
         }
 
         /// <summary>
@@ -522,7 +560,7 @@ namespace VideoProcessorFunction
         ///     <keywords>Keywords and faces from Video Indexer</keywords>
         /// </hearstXML>
         /// </summary>
-        private static async Task CreateEnpsXmlDocument(string topics, string keywords, string slug, string mosXml, string fromStation, string fromPerson, string videoTimestamp)
+        private static async Task CreateEnpsXmlDocument(string stationName, string topics, string keywords, string slug, string mosXml, string fromStation, string fromPerson, string videoTimestamp)
         {
             XmlDocument doc = new XmlDocument();
 
@@ -597,6 +635,10 @@ namespace VideoProcessorFunction
             rootNode.AppendChild(newNode);
 
             // AI topic comparison to each station AI index
+            // TODO: make COSMOS call to get all station topics from all other stations except for this station
+            string allStationTopics = string.Empty;
+            AzureOpenAIService azureOpenAIService = new AzureOpenAIService();
+            var response = await azureOpenAIService.GetChatResponseWithRetryAsync(allStationTopics, topics);
 
             // this is hardcoded now for WESH, but this will be updated in the future to account for other stations
             // based on their location and the area of interest / location of the story

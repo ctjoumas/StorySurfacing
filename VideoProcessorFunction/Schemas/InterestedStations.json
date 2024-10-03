@@ -1,0 +1,19 @@
+{
+  "name": "InterestedStations",
+  "strict": true,
+  "schema": {
+    "type": "object",
+    "properties": {
+      "interestedStations": {
+        "type": "array",
+        "items": {
+          "type": "string"
+        }
+      }
+    },
+    "required": [
+      "interestedStations"
+    ],
+    "additionalProperties": false
+  }
+}
