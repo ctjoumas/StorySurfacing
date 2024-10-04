@@ -5,8 +5,6 @@
     using Polly;
     using Polly.Retry;
     using System;
-    using System.Collections.Generic;
-    using System.Linq;
     using System.Net.Http;
     using System.Text;
     using System.Threading;
@@ -49,7 +47,6 @@
 
         You need to compare the video topics with the topics of interest for each station and return a list of station names that that has at least one topic in common. The topics do not have to match word for word so you will use
         your judgement to determine a match. For example, if a topic of the video is ""baseball"", this would match a station topic of ""sports"" or ""camden yards"".
-
         
         instruction: Using the topics of interest for each station and the video topics, return a list of station names that are interested in the video topics.
         all_station_topics: {all_staton_topics}
@@ -60,7 +57,6 @@
 
         private readonly string _azureOpenAIUrl;
         private readonly string _apiKey;
-        //private readonly IHttpClientFactory _httpClientFactory;
         private readonly ISchemaLoader _schemaLoader;
         private static readonly SemaphoreSlim semaphore = new SemaphoreSlim(5); // Limit concurrency to 5 requests
         private readonly HttpClient _retryClient;
@@ -77,17 +73,16 @@
                 }
             );
 
-        public AzureOpenAIService()//IHttpClientFactory httpClientFactory)
+        public AzureOpenAIService()
         {
             _apiKey = Environment.GetEnvironmentVariable("AzureOpenAIKey", EnvironmentVariableTarget.Process);
             var endPoint = Environment.GetEnvironmentVariable("AzureOpenAIEndpoint", EnvironmentVariableTarget.Process);
             var modelName = Environment.GetEnvironmentVariable("ModelName", EnvironmentVariableTarget.Process);
             var apiVersion = Environment.GetEnvironmentVariable("ApiVersion", EnvironmentVariableTarget.Process);
-            //_httpClientFactory = httpClientFactory;
+
             _azureOpenAIUrl = $"{endPoint}{modelName}/chat/completions?api-version={apiVersion}";
             _schemaLoader = new SchemaLoader(@".\Schemas");
 
-            //using HttpClient _retryClient = _httpClientFactory.CreateClient();
             using HttpClient _retryClient = new HttpClient();
             _retryClient.DefaultRequestHeaders.Add("api-key", _apiKey);
             _retryClient.Timeout = TimeSpan.FromSeconds(60);

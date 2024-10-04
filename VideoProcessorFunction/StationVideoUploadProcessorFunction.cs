@@ -147,12 +147,12 @@ namespace VideoProcessorFunction
             // the database so when videos are pulled up from trend search results, it will have the path to the video on the ENPS
             // server as well as the overview text of the video, including any possible network affiliation if an anchor's name
             // exists in the overview text
-            /*EnpsUtility enpsUtility = new EnpsUtility();
+            EnpsUtility enpsUtility = new EnpsUtility();
             await enpsUtility.Login(log);
             bool processVideo = await enpsUtility.Search(name, log);
             
             // if this video is found to be a story and a PKG, we'll process it
-            if (processVideo)*/
+            if (processVideo)
             {
                 TimeZoneInfo easternZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
 
@@ -578,7 +578,9 @@ namespace VideoProcessorFunction
                 //string fromPerson = "from Person";
                 string videoTimestamp = enpsUtility.VideoTimestamp;
                 //string videoTimestamp = DateTime.Now.ToString();
-                await CreateEnpsXmlDocument(topics, keywords, slug, mosXml, fromStation, fromPerson, videoTimestamp);
+
+                // TODO: need station name
+                await CreateEnpsXmlDocument(string.Empty, topics, keywords, slug, mosXml, fromStation, fromPerson, videoTimestamp);
             }
         }
 
