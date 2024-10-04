@@ -677,18 +677,14 @@ namespace VideoProcessorFunction
         static async Task<string> GetStationTopicsAsync(string excludedStation = null)
         {
             var service = new CosmosDbService<Story>();
-            var query = string.Empty;
 
-            query = string.IsNullOrEmpty(excludedStation) ? "SELECT * FROM c" : $"SELECT * FROM c WHERE c.StationName != '{excludedStation}'";
+            var items = await service.GetStationTopicsAsync(excludedStation);
 
-            var items = await service.QueryItemsAsync(query);
-
-            var projectedItems = items.Where(story => story.Topics != null && story.Topics.Any())
-                .Select(story => new
-                {
-                    stationName = story.PartitionKey,
-                    topics = story.Topics
-                }).ToList();
+            var projectedItems = items.Select(story => new
+            {
+                stationName = story.PartitionKey,
+                topics = story.Topics
+            }).ToList();
 
             var rootObject = new
             {

@@ -35,30 +35,22 @@ namespace VideoProcessorFunction.Services
 
         public async Task<T> GetItemAsync(string propertyName, string value)
         {
-            try
+            var queryDefinition = new QueryDefinition($"SELECT * FROM c WHERE c.{propertyName} = @propertyValue")
+                            .WithParameter("@propertyValue", value);
+
+            var queryIterator = _container.GetItemQueryIterator<T>(queryDefinition);
+
+            List<T> results = new List<T>();
+
+            while (queryIterator.HasMoreResults)
             {
-                var query = new QueryDefinition($"SELECT * FROM c WHERE c.{propertyName} = @propertyValue")
-                                .WithParameter("@propertyValue", value);
-
-                using FeedIterator<T> resultSetIterator = _container.GetItemQueryIterator<T>(query);
-
-                List<T> results = new List<T>();
-                while (resultSetIterator.HasMoreResults)
-                {
-                    FeedResponse<T> response = await resultSetIterator.ReadNextAsync();
-                    results.AddRange(response);
-                }
-
-                var item = results.FirstOrDefault();
-
-                return item;
-            }
-            catch (CosmosException ex) when (ex.StatusCode == System.Net.HttpStatusCode.NotFound)
-            {
-               
+                var currentResultSet = await queryIterator.ReadNextAsync();
+                results.AddRange(currentResultSet);
             }
 
-            return default;
+            var item = results.FirstOrDefault();
+
+            return item;
         }
 
         public async Task<T> UpdateItemAsync(T item)
@@ -73,10 +65,8 @@ namespace VideoProcessorFunction.Services
             await _container.DeleteItemAsync<T>(id, new PartitionKey(partitionKey));
         }
 
-        // Method to query items
-        public async Task<IEnumerable<T>> QueryItemsAsync(string query)
+        public async Task<IEnumerable<T>> QueryItemsAsync(QueryDefinition queryDefinition)
         {
-            var queryDefinition = new QueryDefinition(query);
             var queryIterator = _container.GetItemQueryIterator<T>(queryDefinition);
 
             List<T> results = new List<T>();
@@ -84,13 +74,28 @@ namespace VideoProcessorFunction.Services
             while (queryIterator.HasMoreResults)
             {
                 var currentResultSet = await queryIterator.ReadNextAsync();
-                foreach (var item in currentResultSet)
-                {
-                    results.Add(item);
-                }
+                results.AddRange(currentResultSet);
             }
 
             return results;
+        }
+
+        public async Task<IEnumerable<T>> GetStationTopicsAsync(string excludedStation = null)
+        {
+            var query = string.IsNullOrEmpty(excludedStation)
+                ? "SELECT * FROM c WHERE ARRAY_LENGTH(c.Topics) > 0"
+                : "SELECT * FROM c WHERE c.StationName != @excludedStation AND ARRAY_LENGTH(c.Topics) > 0";
+
+            var queryDefinition = new QueryDefinition(query);
+
+            if (!string.IsNullOrEmpty(excludedStation))
+            {
+                queryDefinition.WithParameter("@excludedStation", excludedStation);
+            }
+
+            var items = await QueryItemsAsync(queryDefinition);
+
+            return items;
         }
     }
 }
