@@ -679,14 +679,7 @@ namespace VideoProcessorFunction
             var service = new CosmosDbService<Story>();
             var query = string.Empty;
 
-            if (string.IsNullOrEmpty(excludedStation))
-            {
-                query = "SELECT * FROM c";
-            }
-            else
-            {
-                query = $"SELECT * FROM c WHERE c.StationName != '{excludedStation}'";
-            }
+            query = string.IsNullOrEmpty(excludedStation) ? "SELECT * FROM c" : $"SELECT * FROM c WHERE c.StationName != '{excludedStation}'";
 
             var items = await service.QueryItemsAsync(query);
 
