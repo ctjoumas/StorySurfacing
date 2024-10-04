@@ -440,12 +440,12 @@ namespace VideoProcessorFunction
             //string possibleNetworkAffiliation = await personNetworkAffiliationUtility.SearchNetworkAffiliationUsingChatGpt4(enpsUtility.VideoOverviewText);*/
             string possibleNetworkAffiliation = "NBC";
 
-            // TODO: Add code to update the entry in Cosmos DB for this video with the topics. Save Topics to Cosmos DB. Update Cosmos DB entry with Topics for existing video.
-            // This call should return the station name so we know to not pull this back when creating the XML document (we are only pulling topics from all other stations when checking "interest of")
-            string stationName = string.Empty;
-          
+            var service = new CosmosDbService<Story>();
+            var story = await service.GetItemAsync("VideoName", videoName);
+            var stationName = story.PartitionKey;
+
             // once the video is processed, we no longer need it in the storage account - TODO: ADD CONTAINER NAME FOR VIDEOS TO APP CONFIG
-            BlobClient blobClient = new BlobClient(StorageAccountConnectionString, "station-a", videoName);
+            BlobClient blobClient = new BlobClient(StorageAccountConnectionString, stationName, videoName);
             if (blobClient.Exists())
             {
                 await blobClient.DeleteAsync();
