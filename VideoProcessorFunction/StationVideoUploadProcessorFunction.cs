@@ -102,8 +102,51 @@ namespace VideoProcessorFunction
         [FunctionName("TestIndexVideo")]
         public static async Task IndexVideoTest([HttpTrigger(authLevel: AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req, ILogger log)
         {
+            EnpsUtility enpsUtility = new EnpsUtility();
+            await enpsUtility.Login(log);
+
+            // call search to populate ENPS Video Path, slug, and other pieces of information needed for the XML file
+            await enpsUtility.Search("4525038_US_IL_Bird_Migration_Building_Collisions_CR__x040n.mp4", log);
+
+            DateTime storyModifiedDate = enpsUtility.StoryDateTime;
+
+            // calls the ENPS BasicContent endpoint which will get the text overview of the video
+            await enpsUtility.GetBasicContent(log);
+
+            Console.WriteLine(enpsUtility.HearstShare);
+
+
+            var cosmosDbService = new CosmosDbService<Story>();
+
+            var story = new Story
+            {
+                Id = Guid.NewGuid().ToString(),
+                PartitionKey = "station-a",
+                VideoName = "4525002_US_NY_Diddy_Court_AP_Explains_CR__x040n.mp4",
+                Topics = new List<string> { "", "", "" },
+                VideoId = "vsmnbeuuiz",
+                StoryDateTime = DateTime.Now,
+                EnpsHearstShare = enpsUtility.HearstShare
+            };
+
+            await cosmosDbService.CreateItemAsync(story);
             //await IndexVideoMetadata(req.Query["state"], req.Query["id"], log);
             await ProcessVideo(req.Query["state"], req.Query["id"], log);
+            /*var cosmosDbService = new CosmosDbService<Story>();
+
+            var story = new Story
+            {
+                Id = Guid.NewGuid().ToString(),
+                PartitionKey = "station-a",
+                VideoName = "test.mp4",
+                Topics = new List<string> { "Sports", "Weather", "Fishing" },
+                VideoId = "videoguid",
+                StoryDateTime = DateTime.Now
+            };
+
+            await cosmosDbService.CreateItemAsync(story);
+
+            await cosmosDbService.GetStationTopicsAsync();*/
         }
 
         /// <summary>
@@ -134,7 +177,7 @@ namespace VideoProcessorFunction
             }
         }
 
-        [FunctionName("StationAVideoUploadTrigger")]
+        [FunctionName("HearstVideoUploadTrigger")]
         public static async Task RunStationAVideo(
             [BlobTrigger("station-a/{name}", 
             Connection = "StorageConnectionString")] Stream videoBlob, 
@@ -150,9 +193,16 @@ namespace VideoProcessorFunction
             EnpsUtility enpsUtility = new EnpsUtility();
             await enpsUtility.Login(log);
             bool processVideo = await enpsUtility.Search(name, log);
-            
-            // if this video is found to be a story and a PKG, we'll process it
-            if (processVideo)
+
+            // The above processVideo determines if the video is not more than a day old and is a PKG; but if Hearst determines
+            // that the video should be shared to all stations, the HearstShare property will be set to true and the video will be
+            // processed regardless of the above conditions. We get the HearstShare property from the ENPS BasicContent call
+            await enpsUtility.GetBasicContent(log);
+
+            bool forceShare = enpsUtility.HearstShare;
+
+            // if the video is set to be shared to all stations or, if not, it is a PKG and less than a day old, we will process the video
+            if (forceShare || processVideo)
             {
                 TimeZoneInfo easternZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
 
@@ -162,7 +212,7 @@ namespace VideoProcessorFunction
 
                 log.LogInformation($"Blob created on: {blobCreatedDateTimeEst}  ====== Current time minus {TIME_THRESHOLD} mins: {currentTimeMinusTenMinutesEst}");
 
-                if (blobCreatedDateTimeEst < currentTimeMinusTenMinutesEst)
+                if (!forceShare || (blobCreatedDateTimeEst < currentTimeMinusTenMinutesEst))
                 {
                     log.LogInformation($"Blob trigger function for Station A SKIPPING blob\n Name: {name} because it was uploaded more than {TIME_THRESHOLD} minutes ago.");
                 }
@@ -180,7 +230,11 @@ namespace VideoProcessorFunction
                         Id = Guid.NewGuid().ToString(),
                         PartitionKey = station,
                         VideoName = name,
-                        StoryDateTime = enpsUtility.StoryDateTime
+                        StoryDateTime = enpsUtility.StoryDateTime,
+                        EnpsSlug = enpsUtility.Slug,
+                        EnpsMediaObject = enpsUtility.MediaObject,
+                        EnpsFromPerson = enpsUtility.FromPerson,
+                        EnpsVideoTimestamp = enpsUtility.VideoTimestamp
                     };
 
                     await cosmosDbService.CreateItemAsync(story);
@@ -412,36 +466,20 @@ namespace VideoProcessorFunction
 
             var videoGetIndexResult = await videoGetIndexRequestResult.Content.ReadAsStringAsync();
 
-            string videoName = System.Text.Json.JsonSerializer.Deserialize<Video>(videoGetIndexResult).Name;
+            var cosmosDbService = new CosmosDbService<Story>();
+            Story story = await cosmosDbService.GetItemAsync("VideoId", videoId);
+            string videoName = story.VideoName;
 
             log.LogInformation($"Here is the full JSON of the indexed video for video ID {videoId}: \n{videoGetIndexResult}");
-
-            // when the video was first processed by the RunStationAVideo trigger, we checked ENPS to ensure this video is a PKG but we
-            // still need to use the ENPS client to return back the pieces of information we need to include in
-            // the XML file which include the path to the video on the ENPS server as well as the overview text of the video, including
-            // any possible network affiliation (future) if an anchor's name exists in the overview text
-            EnpsUtility enpsUtility = new EnpsUtility();
-            await enpsUtility.Login(log);
-
-            // testing - remove after testing
-            string videoNameTest = System.Text.Json.JsonSerializer.Deserialize<Video>(videoGetIndexResult).Name;
-
-            // call search to populate ENPS Video Path, slug, and other pieces of information needed for the XML file
-            await enpsUtility.Search(videoName, log);
-
-            DateTime storyModifiedDate = enpsUtility.StoryDateTime;
-
-            // calls the ENPS BasicContent endpoint which will get the text overview of the video
-            await enpsUtility.GetBasicContent(log);
 
             // ask GPT-4 to see if a name is embedded in the video overview text and return any network affiliation
             // COMMENTING OUT FOR TESTING WITHOUT ENPS SERVER
             //PersonNetworkAffiliationUtility personNetworkAffiliationUtility = new PersonNetworkAffiliationUtility();
             //string possibleNetworkAffiliation = await personNetworkAffiliationUtility.SearchNetworkAffiliationUsingChatGpt4(enpsUtility.VideoOverviewText);*/
-            string possibleNetworkAffiliation = "NBC";
+            //string possibleNetworkAffiliation = "NBC";
 
-            var service = new CosmosDbService<Story>();
-            var story = await service.GetItemAsync("VideoName", videoName);
+            //var service = new CosmosDbService<Story>();
+            //var story = await service.GetItemAsync("VideoName", videoName);
             var stationName = story.PartitionKey;
 
             // once the video is processed, we no longer need it in the storage account - TODO: ADD CONTAINER NAME FOR VIDEOS TO APP CONFIG
@@ -465,16 +503,9 @@ namespace VideoProcessorFunction
             }
 
             string keywords = videoIndexerResourceProviderClient.Keywords;
-            string slug = enpsUtility.Slug;
-            //string slug = "slug";
-            string mosXml = enpsUtility.MediaObject;
             //string mosXml = "<mos><itemID>2</itemID><itemSlug>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</itemSlug><objID>fae8d129-2374-4aa3-bfa0-51532fbc076c</objID><mosID>BC.PRECIS2.WESH.HEARST.MOS</mosID><mosAbstract>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</mosAbstract><abstract>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</abstract><objDur>5580</objDur><objTB>60</objTB><objSlug>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</objSlug><objType>VIDEO</objType><objPaths><objPath>https://WESH-CONT1.companynet.org:10456/broadcast/fae8d129-2374-4aa3-bfa0-51532fbc076c.mxf</objPath><objProxyPath techDescription=\"Proxy\">https://WESH-CONT1.companynet.org:10456/proxy/fae8d129-2374-4aa3-bfa0-51532fbc076cProxy.mp4</objProxyPath><objProxyPath techDescription=\"JPG\">https://WESH-CONT1.companynet.org:10456/still/fae8d129-2374-4aa3-bfa0-51532fbc076c.jpg</objProxyPath></objPaths><mosExternalMetadata><mosScope>STORY</mosScope><mosSchema>http://bitcentral.com/schemas/mos/2.0</mosSchema><mosPayload /></mosExternalMetadata><itemChannel>X</itemChannel><objAir>NOT READY</objAir></mos>";
-            string fromStation = "wesh";
-            string fromPerson = enpsUtility.FromPerson;
-            //string fromPerson = "from Person";
-            string videoTimestamp = enpsUtility.VideoTimestamp;
             //string videoTimestamp = DateTime.Now.ToString();
-            await CreateEnpsXmlDocument(stationName, topics, keywords, slug, mosXml, fromStation, fromPerson, videoTimestamp);
+            await CreateEnpsXmlDocument(story.EnpsHearstShare, stationName, topics, keywords, story.EnpsSlug, story.EnpsMediaObject, stationName, story.EnpsFromPerson, story.EnpsVideoTimestamp);
         }
 
         /// <summary>
@@ -491,8 +522,9 @@ namespace VideoProcessorFunction
         ///     <subject>Topics from Video Indexer</subject>
         ///     <keywords>Keywords and faces from Video Indexer</keywords>
         /// </hearstXML>
+        /// <param name="forceShare">From the ENPS system for this video, signifying if this video should be shared regardless of other conditions</param>
         /// </summary>
-        private static async Task CreateEnpsXmlDocument(string stationName, string topics, string keywords, string slug, string mosXml, string fromStation, string fromPerson, string videoTimestamp)
+        private static async Task CreateEnpsXmlDocument(bool forceShare, string stationName, string topics, string keywords, string slug, string mosXml, string fromStation, string fromPerson, string videoTimestamp)
         {
             XmlDocument doc = new XmlDocument();
 
@@ -534,6 +566,7 @@ namespace VideoProcessorFunction
 
             rootNode.AppendChild(newNode);
 
+            // TODO: If HearstShare is true, this may not be a PKG so we may need to add the type to Cosmos when video is first uploaded
             newNode = doc.CreateElement("videoGenre");
             newNode.InnerText = "PKG";
             rootNode.AppendChild(newNode);
@@ -551,7 +584,6 @@ namespace VideoProcessorFunction
             newNode.InnerText = dtVideoTimestamp.ToString("yyyyMMdd HH:mm");
             rootNode.AppendChild(newNode);
 
-            // testing current EST
             newNode = doc.CreateElement("AzureProcessTimeStamp");
             TimeZoneInfo easternZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
             DateTime currentEstTime = TimeZoneInfo.ConvertTime(new DateTime(DateTime.Now.Year, DateTime.Now.Month, DateTime.Now.Day, DateTime.Now.Hour, DateTime.Now.Minute, DateTime.Now.Second), easternZone);
@@ -567,15 +599,29 @@ namespace VideoProcessorFunction
             rootNode.AppendChild(newNode);
 
             // AI topic comparison to each station AI index
-            // TODO: make COSMOS call to get all station topics from all other stations except for this station
-            string allStationTopics = string.Empty;
-            AzureOpenAIService azureOpenAIService = new AzureOpenAIService();
-            var response = await azureOpenAIService.GetChatResponseWithRetryAsync(allStationTopics, topics);
+            // TODO: Test
+            string ofInterestToStations = string.Empty;            
+            if (!forceShare)
+            {
+                string allStationTopics = await GetStationTopicsAsync(stationName);
+                AzureOpenAIService azureOpenAIService = new AzureOpenAIService();
+                var response = await azureOpenAIService.GetChatResponseWithRetryAsync(allStationTopics, topics);
+
+                // TODO: pull out stations of interested from the response
+                // ofInterestToStations = response....
+            }
+            else
+            {
+                // TODO: add all stations to maybe an OfInterestToStations env variable for the function app
+                // ofInterestToStations = Environment.GetEnvironmentVariable("OfInterestToStations");
+            }
 
             // this is hardcoded now for WESH, but this will be updated in the future to account for other stations
             // based on their location and the area of interest / location of the story
             newNode = doc.CreateElement("ofInterestTo");
-            newNode.InnerText = "WESH WCVB WBAL";
+            // TODO: add stations from above TODO
+            //newNode.InnerText = "WESH WCVB WBAL";
+            newNode.InnerText = ofInterestToStations;
             rootNode.AppendChild(newNode);
 
             using (MemoryStream xmlStream = new MemoryStream())
