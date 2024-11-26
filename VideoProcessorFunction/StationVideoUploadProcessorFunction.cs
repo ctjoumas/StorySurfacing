@@ -27,6 +27,7 @@ namespace VideoProcessorFunction
     using VideoProcessorFunction.Services;
     using System.Linq;
     using Newtonsoft.Json;
+    using Microsoft.AspNetCore.Mvc;
 
     public static class StationVideoUploadProcessorFunction
     {
@@ -47,6 +48,18 @@ namespace VideoProcessorFunction
 
         [FunctionName("TestEnpsConnectivity")]
         public static async Task EnpsConnectivityTest([HttpTrigger(authLevel:AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req, ILogger log)
+        {
+            var enpsUtility = new EnpsUtility();
+
+            log.LogInformation("Attempting to log into ENPS Server on VM...");
+
+            await enpsUtility.Login(log);
+
+            log.LogInformation("Done ENPS login");
+        }
+
+        [FunctionName("LlmResponsTest")]
+        public static async Task<IActionResult> LlmResponsTest([HttpTrigger(authLevel: AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req, ILogger log)
         {
             string allStationTopics = @"
                 {
@@ -80,16 +93,9 @@ namespace VideoProcessorFunction
                 }
             ";
 
-            AzureOpenAIService azureOpenAIService = new AzureOpenAIService();
+            var azureOpenAIService = new AzureOpenAIService();
             var response = await azureOpenAIService.GetChatResponseWithRetryAsync(allStationTopics, videoTopics);
-
-            EnpsUtility enpsUtility = new EnpsUtility();
-
-            log.LogInformation("Attempting to log into ENPS Server on VM...");
-
-            await enpsUtility.Login(log);
-
-            log.LogInformation("Done ENPS login");
+            return new OkObjectResult(response);
         }
 
         /// <summary>
@@ -179,11 +185,11 @@ namespace VideoProcessorFunction
 
         [FunctionName("HearstVideoUploadTrigger")]
         public static async Task RunStationAVideo(
-            [BlobTrigger("station-a/{name}", 
-            Connection = "StorageConnectionString")] Stream videoBlob, 
-            string name, 
-            Uri uri, 
-            ILogger log, 
+            [BlobTrigger("station-a/{name}",
+            Connection = "StorageConnectionString")] Stream videoBlob,
+            string name,
+            Uri uri,
+            ILogger log,
             BlobProperties properties)
         {
             // we first need to check ENPS to ensure this is a PKG and return back the pieces of information we need to include in
