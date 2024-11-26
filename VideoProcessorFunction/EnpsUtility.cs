@@ -52,8 +52,15 @@
         /// </summary>
         public string VideoTimestamp { get; set; }
 
+        /// <summary>
+        /// HearstShare boolean value from ENPS, which will indicate whether this will be a video that is shared
+        /// regardless of the rules we have in place (i.e. share even if it's not a PKG, is a day older, etc)
+        /// </summary>
+        public bool HearstShare { get; set; }
+
         // THIS WILL BE AN APP CONFIG VALUE FOR THE ENPS SERVER
-        private string ServerAddress = "http://WESH-CONT1.companynet.org:10456/proxy/";
+        //private string ServerAddress = "http://WESH-CONT1.companynet.org:10456/proxy/";
+        private string ServerAddress = "http://video-server/proxy/";
 
         /// <summary>
         /// Logs into the ENPS Server in order to retrieve the SessionID, which will be used for the subsequent search requests
@@ -288,6 +295,10 @@
                         else if (fieldName.ToLower().Equals("modtime"))
                         {
                             VideoTimestamp = objectPropertyToken["FieldValue"].ToString();
+                        }
+                        else if (fieldName.ToLower().Equals("hearstshare"))
+                        {
+                            HearstShare = bool.Parse(objectPropertyToken["FieldValue"].ToString());
                         }
                     }
                 }
