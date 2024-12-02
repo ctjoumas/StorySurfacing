@@ -5,7 +5,6 @@ using System.Net.Http.Headers;
 using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
-using System.Text.Json.Serialization;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json.Linq;
 using VideoProcessorFunction.Models;

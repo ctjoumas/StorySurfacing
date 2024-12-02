@@ -5,7 +5,6 @@ using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Logging;
 using System.Net.Http;
 using System.Collections.Generic;
-using System.Text.Json.Serialization;
 using System.Web;
 using Azure.Storage.Blobs;
 using Azure.Storage.Sas;
@@ -183,20 +182,25 @@ namespace VideoProcessorFunction
             }
         }
 
-        [FunctionName("HearstVideoUploadTrigger")]
+        [FunctionName("WeshUploadTrigger")]
         public static async Task RunStationAVideo(
-            [BlobTrigger("station-a/{name}",
+            [BlobTrigger("wesh/{name}",
             Connection = "StorageConnectionString")] Stream videoBlob,
             string name,
             Uri uri,
             ILogger log,
             BlobProperties properties)
         {
+            await TriggerHandler(name, uri, log, properties);
+        }
+
+        private static async Task TriggerHandler(string name, Uri uri, ILogger log, BlobProperties properties)
+        {
             // we first need to check ENPS to ensure this is a PKG and return back the pieces of information we need to include in
             // the database so when videos are pulled up from trend search results, it will have the path to the video on the ENPS
             // server as well as the overview text of the video, including any possible network affiliation if an anchor's name
             // exists in the overview text
-            EnpsUtility enpsUtility = new EnpsUtility();
+            var enpsUtility = new EnpsUtility();
             await enpsUtility.Login(log);
             bool processVideo = await enpsUtility.Search(name, log);
 
