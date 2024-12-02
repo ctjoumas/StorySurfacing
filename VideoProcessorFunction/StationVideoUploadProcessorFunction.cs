@@ -48,6 +48,8 @@ namespace VideoProcessorFunction
         [FunctionName("TestEnpsConnectivity")]
         public static async Task EnpsConnectivityTest([HttpTrigger(authLevel:AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req, ILogger log)
         {
+            var stations = Environment.GetEnvironmentVariable("Stations");
+
             var enpsUtility = new EnpsUtility();
 
             log.LogInformation("Attempting to log into ENPS Server on VM...");
@@ -119,7 +121,6 @@ namespace VideoProcessorFunction
             await enpsUtility.GetBasicContent(log);
 
             Console.WriteLine(enpsUtility.HearstShare);
-
 
             var cosmosDbService = new CosmosDbService<Story>();
 
@@ -536,6 +537,8 @@ namespace VideoProcessorFunction
         /// </summary>
         private static async Task CreateEnpsXmlDocument(bool forceShare, string stationName, string topics, string keywords, string slug, string mosXml, string fromStation, string fromPerson, string videoTimestamp)
         {
+            //var inputStations = Environment.GetEnvironmentVariable("StorageConnectionString");
+            //var stations = inputStations.Split('|').ToList();
             XmlDocument doc = new XmlDocument();
 
             XmlNode newNode = doc.CreateElement("hearstXML");
