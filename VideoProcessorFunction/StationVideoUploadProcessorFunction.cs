@@ -171,7 +171,6 @@ namespace VideoProcessorFunction
             // If video is processed
             if (req.Query["state"].Equals(ProcessingState.Processed.ToString()))
             {
-                //await IndexVideoMetadata(req.Query["state"], req.Query["id"], log);
                 await ProcessVideo(req.Query["state"], req.Query["id"], log);
             }
             else if (req.Query["state"].Equals(ProcessingState.Failed.ToString()))
@@ -184,8 +183,44 @@ namespace VideoProcessorFunction
         }
 
         [FunctionName("WeshUploadTrigger")]
-        public static async Task RunStationAVideo(
+        public static async Task WeshUploadTrigger(
             [BlobTrigger("wesh/{name}",
+            Connection = "StorageConnectionString")] Stream videoBlob,
+            string name,
+            Uri uri,
+            ILogger log,
+            BlobProperties properties)
+        {
+            await TriggerHandler(name, uri, log, properties);
+        }
+
+        [FunctionName("WcvbUploadTrigger")]
+        public static async Task WcvbUploadTrigger(
+            [BlobTrigger("wcvb/{name}",
+            Connection = "StorageConnectionString")] Stream videoBlob,
+            string name,
+            Uri uri,
+            ILogger log,
+            BlobProperties properties)
+        {
+            await TriggerHandler(name, uri, log, properties);
+        }
+
+        [FunctionName("KcraUploadTrigger")]
+        public static async Task KcraUploadTrigger(
+            [BlobTrigger("kcra/{name}",
+            Connection = "StorageConnectionString")] Stream videoBlob,
+            string name,
+            Uri uri,
+            ILogger log,
+            BlobProperties properties)
+        {
+            await TriggerHandler(name, uri, log, properties);
+        }
+
+        [FunctionName("WmurUploadTrigger")]
+        public static async Task WmurUploadTrigger(
+            [BlobTrigger("wmur/{name}",
             Connection = "StorageConnectionString")] Stream videoBlob,
             string name,
             Uri uri,

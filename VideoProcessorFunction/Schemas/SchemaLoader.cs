@@ -1,12 +1,8 @@
-﻿namespace VideoProcessorFunction.Schemas
-{
-    using System;
-    using System.Collections.Generic;
-    using System.IO;
-    using System.Linq;
-    using System.Text;
-    using System.Threading.Tasks;
+﻿using System;
+using System.IO;
 
+namespace VideoProcessorFunction.Schemas
+{
     public interface ISchemaLoader
     {
         string LoadSchema(string schemaName);
