@@ -1,34 +1,34 @@
+using System;
+using System.IO;
+using System.Threading.Tasks;
+using Microsoft.Azure.WebJobs;
+using Microsoft.Extensions.Logging;
+using System.Net.Http;
+using System.Collections.Generic;
+using System.Text.Json.Serialization;
+using System.Web;
+using Azure.Storage.Blobs;
+using Azure.Storage.Sas;
+using Azure.Storage.Blobs.Models;
+using Microsoft.Azure.WebJobs.Extensions.Http;
+using Microsoft.AspNetCore.Http;
+using Azure.Core;
+using Azure.Identity;
+using System.Net.Http.Headers;
+using Newtonsoft.Json.Linq;
+using System.Xml;
+using System.Security.Cryptography;
+using System.Text;
+using System.Globalization;
+using CoreFtp;
+using VideoProcessorFunction.Models;
+using VideoProcessorFunction.Services;
+using System.Linq;
+using Newtonsoft.Json;
+using Microsoft.AspNetCore.Mvc;
+
 namespace VideoProcessorFunction
 {
-    using System;
-    using System.IO;
-    using System.Threading.Tasks;
-    using Microsoft.Azure.WebJobs;
-    using Microsoft.Extensions.Logging;
-    using System.Net.Http;
-    using System.Collections.Generic;
-    using System.Text.Json.Serialization;
-    using System.Web;
-    using Azure.Storage.Blobs;
-    using Azure.Storage.Sas;
-    using Azure.Storage.Blobs.Models;
-    using Microsoft.Azure.WebJobs.Extensions.Http;
-    using Microsoft.AspNetCore.Http;
-    using Azure.Core;
-    using Azure.Identity;
-    using System.Net.Http.Headers;
-    using Newtonsoft.Json.Linq;
-    using System.Xml;
-    using System.Security.Cryptography;
-    using System.Text;
-    using System.Globalization;
-    using CoreFtp;
-    using VideoProcessorFunction.Models;
-    using VideoProcessorFunction.Services;
-    using System.Linq;
-    using Newtonsoft.Json;
-    using Microsoft.AspNetCore.Mvc;
-
     public static class StationVideoUploadProcessorFunction
     {
         private const string AzureResourceManager = "https://management.azure.com";
@@ -700,57 +700,5 @@ namespace VideoProcessorFunction
             story.Topics = topicsList;
             await service.UpdateItemAsync(story);
         }
-    }
-
-    public class AccessTokenRequest
-    {
-        [JsonPropertyName("permissionType")]
-        public ArmAccessTokenPermission PermissionType { get; set; }
-
-        [JsonPropertyName("scope")]
-        public ArmAccessTokenScope Scope { get; set; }
-
-        /*[JsonPropertyName("projectId")]
-        public string ProjectId { get; set; }
-
-        [JsonPropertyName("videoId")]
-        public string VideoId { get; set; }*/
-    }
-
-    [System.Text.Json.Serialization.JsonConverter(typeof(JsonStringEnumConverter))]
-    public enum ArmAccessTokenPermission
-    {
-        Reader,
-        Contributor,
-        MyAccessAdministrator,
-        Owner,
-    }
-
-    [System.Text.Json.Serialization.JsonConverter(typeof(JsonStringEnumConverter))]
-    public enum ArmAccessTokenScope
-    {
-        Account,
-        Project,
-        Video
-    }
-
-    public class Video
-    {
-        [JsonPropertyName("id")]
-        public string Id { get; set; }
-
-        [JsonPropertyName("state")]
-        public string State { get; set; }
-
-        [JsonPropertyName("name")]
-        public string Name { get; set; }
-    }
-
-    public enum ProcessingState
-    {
-        Uploaded,
-        Processing,
-        Processed,
-        Failed
     }
 }
