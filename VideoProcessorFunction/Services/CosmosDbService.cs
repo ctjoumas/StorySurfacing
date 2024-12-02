@@ -1,5 +1,4 @@
-﻿using Azure.Core;
-using Azure.Identity;
+﻿using Azure.Identity;
 using Microsoft.Azure.Cosmos;
 using System;
 using System.Collections.Generic;

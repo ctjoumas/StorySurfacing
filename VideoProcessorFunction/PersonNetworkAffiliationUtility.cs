@@ -1,14 +1,11 @@
-﻿namespace VideoProcessorFunction
-{
-    using Azure.AI.OpenAI;
-    using Azure;
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Text;
-    using System.Threading.Tasks;
-    using System.Web;
+﻿using Azure.AI.OpenAI;
+using Azure;
+using System;
+using System.Threading.Tasks;
+using System.Web;
 
+namespace VideoProcessorFunction
+{
     internal class PersonNetworkAffiliationUtility
     {
         private string AzureOpenAiEndpoint = Environment.GetEnvironmentVariable("CanadaAzureOpenAiEndpoint");
