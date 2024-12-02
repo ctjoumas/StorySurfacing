@@ -128,7 +128,7 @@ namespace VideoProcessorFunction
             {
                 Id = Guid.NewGuid().ToString(),
                 PartitionKey = "station-a",
-                VideoName = "4525002_US_NY_Diddy_Court_AP_Explains_CR__x040n.mp4",
+                VideoName = "4525038_US_IL_Bird_Migration_Building_Collisions_CR__x040n.mp4",
                 Topics = new List<string> { "", "", "" },
                 VideoId = "vsmnbeuuiz",
                 StoryDateTime = DateTime.Now,
@@ -138,21 +138,10 @@ namespace VideoProcessorFunction
             await cosmosDbService.CreateItemAsync(story);
             //await IndexVideoMetadata(req.Query["state"], req.Query["id"], log);
             await ProcessVideo(req.Query["state"], req.Query["id"], log);
-            /*var cosmosDbService = new CosmosDbService<Story>();
+            
+            //await cosmosDbService.CreateItemAsync(story);
 
-            var story = new Story
-            {
-                Id = Guid.NewGuid().ToString(),
-                PartitionKey = "station-a",
-                VideoName = "test.mp4",
-                Topics = new List<string> { "Sports", "Weather", "Fishing" },
-                VideoId = "videoguid",
-                StoryDateTime = DateTime.Now
-            };
-
-            await cosmosDbService.CreateItemAsync(story);
-
-            await cosmosDbService.GetStationTopicsAsync();*/
+            //await cosmosDbService.GetStationTopicsAsync();
         }
 
         /// <summary>
