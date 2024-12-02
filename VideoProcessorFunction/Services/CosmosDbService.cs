@@ -20,7 +20,8 @@ namespace VideoProcessorFunction.Services
         private static string CosmosDatabaseName = Environment.GetEnvironmentVariable("CosmosDatabaseName");
         private static string CosmosContainerName = Environment.GetEnvironmentVariable("CosmosContainerName");
         private static string CosmosAccountUri = Environment.GetEnvironmentVariable("CosmosAccountUri");
-        private static string CosmosConnectionString = Environment.GetEnvironmentVariable("CosmosDbConnectionString");
+        //private static string CosmosConnectionString = Environment.GetEnvironmentVariable("CosmosDbConnectionString");
+        private static string TenantId = Environment.GetEnvironmentVariable("TenantId");
 
         public CosmosDbService()
         {
@@ -29,7 +30,7 @@ namespace VideoProcessorFunction.Services
                 tokenCredential: new DefaultAzureCredential(
                     new DefaultAzureCredentialOptions
                     {
-                        TenantId = "16b3c013-d300-468d-ac64-7eda0820b6d3",
+                        TenantId = TenantId,
                         ExcludeEnvironmentCredential = true
                     })
             );
