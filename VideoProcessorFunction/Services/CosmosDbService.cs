@@ -19,7 +19,6 @@ namespace VideoProcessorFunction.Services
         private static string CosmosDatabaseName = Environment.GetEnvironmentVariable("CosmosDatabaseName");
         private static string CosmosContainerName = Environment.GetEnvironmentVariable("CosmosContainerName");
         private static string CosmosAccountUri = Environment.GetEnvironmentVariable("CosmosAccountUri");
-        //private static string CosmosConnectionString = Environment.GetEnvironmentVariable("CosmosDbConnectionString");
         private static string TenantId = Environment.GetEnvironmentVariable("TenantId");
 
         public CosmosDbService()
@@ -40,6 +39,8 @@ namespace VideoProcessorFunction.Services
 
         public async Task<T> CreateItemAsync(T item)
         {
+            // TODO: Add check to ensure we aren't creating a duplicate item
+            // Partition Name: StationName & video
             var response = await _container.CreateItemAsync(item, new PartitionKey(item.PartitionKey));
             return response.Resource;
         }
