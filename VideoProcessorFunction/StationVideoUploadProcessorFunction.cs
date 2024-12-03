@@ -596,7 +596,7 @@ namespace VideoProcessorFunction
         /// </summary>
         private static async Task CreateEnpsXmlDocument(bool forceShare, string stationName, string topics, string keywords, string slug, string mosXml, string fromStation, string fromPerson, string videoTimestamp)
         {
-            //var inputStations = Environment.GetEnvironmentVariable("StorageConnectionString");
+            //var inputStations = Environment.GetEnvironmentVariable("Stations");
             //var stations = inputStations.Split('|').ToList();
             XmlDocument doc = new XmlDocument();
 
