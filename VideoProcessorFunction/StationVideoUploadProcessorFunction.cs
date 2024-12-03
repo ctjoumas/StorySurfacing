@@ -155,19 +155,26 @@ namespace VideoProcessorFunction
         [FunctionName("GetVideoStatus")]
         public static async Task ReceiveVideoIndexerStateUpdate([HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequest req, ILogger log)
         {
-            log.LogInformation($"Received Video Indexer status update - Video ID: {req.Query["id"]} \t Processing State: {req.Query["state"]}");
+            try
+            {
+                log.LogInformation($"Received Video Indexer status update - Video ID: {req.Query["id"]} \t Processing State: {req.Query["state"]}");
 
-            // If video is processed
-            if (req.Query["state"].Equals(ProcessingState.Processed.ToString()))
-            {
-                await ProcessVideo(req.Query["state"], req.Query["id"], log);
+                // If video is processed
+                if (req.Query["state"].Equals(ProcessingState.Processed.ToString()))
+                {
+                    await ProcessVideo(req.Query["state"], req.Query["id"], log);
+                }
+                else if (req.Query["state"].Equals(ProcessingState.Failed.ToString()))
+                {
+                    log.LogInformation($"\nThe video index failed for video ID {req.Query["id"]}.");
+                    var service = new CosmosDbService<Story>();
+                    var story = await service.GetItemAsync("VideoId", req.Query["id"]);
+                    await service.DeleteItemAsync(story.Id, story.PartitionKey);
+                }
             }
-            else if (req.Query["state"].Equals(ProcessingState.Failed.ToString()))
+            catch(Exception ex)
             {
-                log.LogInformation($"\nThe video index failed for video ID {req.Query["id"]}.");
-                var service = new CosmosDbService<Story>();
-                var story = await service.GetItemAsync("VideoId", req.Query["id"]);
-                await service.DeleteItemAsync(story.Id, story.PartitionKey);
+                log.LogError(ex.ToString());
             }
         }
 
@@ -575,7 +582,7 @@ namespace VideoProcessorFunction
             string keywords = videoIndexerResourceProviderClient.Keywords;
             //string mosXml = "<mos><itemID>2</itemID><itemSlug>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</itemSlug><objID>fae8d129-2374-4aa3-bfa0-51532fbc076c</objID><mosID>BC.PRECIS2.WESH.HEARST.MOS</mosID><mosAbstract>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</mosAbstract><abstract>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</abstract><objDur>5580</objDur><objTB>60</objTB><objSlug>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</objSlug><objType>VIDEO</objType><objPaths><objPath>https://WESH-CONT1.companynet.org:10456/broadcast/fae8d129-2374-4aa3-bfa0-51532fbc076c.mxf</objPath><objProxyPath techDescription=\"Proxy\">https://WESH-CONT1.companynet.org:10456/proxy/fae8d129-2374-4aa3-bfa0-51532fbc076cProxy.mp4</objProxyPath><objProxyPath techDescription=\"JPG\">https://WESH-CONT1.companynet.org:10456/still/fae8d129-2374-4aa3-bfa0-51532fbc076c.jpg</objProxyPath></objPaths><mosExternalMetadata><mosScope>STORY</mosScope><mosSchema>http://bitcentral.com/schemas/mos/2.0</mosSchema><mosPayload /></mosExternalMetadata><itemChannel>X</itemChannel><objAir>NOT READY</objAir></mos>";
             //string videoTimestamp = DateTime.Now.ToString();
-            await CreateEnpsXmlDocument(story.EnpsHearstShare, stationName, topics, keywords, story.EnpsSlug, story.EnpsMediaObject, stationName, story.EnpsFromPerson, story.EnpsVideoTimestamp);
+            await CreateEnpsXmlDocument(story.EnpsHearstShare, stationName, topics, keywords, story.EnpsSlug, story.EnpsMediaObject, stationName, story.EnpsFromPerson, story.EnpsVideoTimestamp, log);
         }
 
         /// <summary>
@@ -594,10 +601,21 @@ namespace VideoProcessorFunction
         /// </hearstXML>
         /// <param name="forceShare">From the ENPS system for this video, signifying if this video should be shared regardless of other conditions</param>
         /// </summary>
-        private static async Task CreateEnpsXmlDocument(bool forceShare, string stationName, string topics, string keywords, string slug, string mosXml, string fromStation, string fromPerson, string videoTimestamp)
+        private static async Task CreateEnpsXmlDocument(
+            bool forceShare, 
+            string stationName, 
+            string topics, 
+            string keywords, 
+            string slug, 
+            string mosXml, 
+            string fromStation, 
+            string fromPerson, 
+            string videoTimestamp,
+            ILogger logger)
         {
             //var inputStations = Environment.GetEnvironmentVariable("Stations");
             //var stations = inputStations.Split('|').ToList();
+            logger.LogInformation($"Creating Hearst XML for station {stationName}");
             XmlDocument doc = new XmlDocument();
 
             XmlNode newNode = doc.CreateElement("hearstXML");
@@ -605,13 +623,14 @@ namespace VideoProcessorFunction
 
             // Message ID needs to be 7 characters, so generate SHA256 and truncate it. We'll base this
             // off of the slug
-            string messageId = "";
+            string messageId = string.Empty;
             using (SHA256 sha256 = SHA256.Create())
             {
                 byte[] hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(slug));
                 string hexDigest = BitConverter.ToString(hashBytes).Replace("-", "").ToLower();
                 messageId = hexDigest.Substring(0, 7);
             }
+
             newNode = doc.CreateElement("messageID");
             newNode.InnerText = messageId;
             rootNode.AppendChild(newNode);
@@ -627,15 +646,7 @@ namespace VideoProcessorFunction
             mosXml = mosXml.Replace("\u00A0", " ");
             //mosXml = System.Text.RegularExpressions.Regex.Unescape(mosXml);
 
-            try
-            {
-                newNode.InnerXml = mosXml;
-            }
-            catch (Exception e)
-            {
-                Console.WriteLine(e.ToString());
-            }
-
+            newNode.InnerXml = mosXml;
             rootNode.AppendChild(newNode);
 
             // TODO: If HearstShare is true, this may not be a PKG so we may need to add the type to Cosmos when video is first uploaded
@@ -696,6 +707,7 @@ namespace VideoProcessorFunction
             newNode.InnerText = ofInterestToStations;
             rootNode.AppendChild(newNode);
 
+            logger.LogInformation($"End creating Hearst XML for station {stationName}");
             using (MemoryStream xmlStream = new MemoryStream())
             {
                 using (var ftpClient = new FtpClient(new FtpClientConfiguration
@@ -708,15 +720,11 @@ namespace VideoProcessorFunction
                 }))
                 {
                     await ftpClient.LoginAsync();
-
-                    using (var writeStream = await ftpClient.OpenFileWriteStreamAsync($"{messageId}.xml"))
-                    {
-                        doc.Save(writeStream);
-                    }
+                    using var writeStream = await ftpClient.OpenFileWriteStreamAsync($"{messageId}.xml");
+                    doc.Save(writeStream);
+                    logger.LogInformation($"XML document {messageId}.xml uploaded to FTP server");
                 }
             }
-
-            //doc.Save("C:\\Rapid Innovation\\Story Surfacing\\enps.xml");
         }
 
         static string CreateQueryString(IDictionary<string, string> parameters)
