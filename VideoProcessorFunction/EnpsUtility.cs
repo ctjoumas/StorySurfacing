@@ -1,15 +1,15 @@
-﻿namespace VideoProcessorFunction
-{
-    using Microsoft.Extensions.Logging;
-    using Newtonsoft.Json;
-    using Newtonsoft.Json.Linq;
-    using System;
-    using System.Collections.Generic;
-    using System.Linq;
-    using System.Net.Http;
-    using System.Text;
-    using System.Threading.Tasks;
+﻿using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Net.Http;
+using System.Text;
+using System.Threading.Tasks;
 
+namespace VideoProcessorFunction
+{
     internal class EnpsUtility
     {
         private string EnspDevKey = Environment.GetEnvironmentVariable("EnpsDevKey");

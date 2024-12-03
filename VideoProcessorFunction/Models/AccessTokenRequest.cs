@@ -9,11 +9,5 @@ namespace VideoProcessorFunction.Models
 
         [JsonPropertyName("scope")]
         public ArmAccessTokenScope Scope { get; set; }
-
-        /*[JsonPropertyName("projectId")]
-        public string ProjectId { get; set; }
-
-        [JsonPropertyName("videoId")]
-        public string VideoId { get; set; }*/
     }
 }

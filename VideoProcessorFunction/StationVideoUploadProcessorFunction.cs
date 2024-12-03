@@ -25,7 +25,6 @@ using VideoProcessorFunction.Services;
 using System.Linq;
 using Newtonsoft.Json;
 using Microsoft.AspNetCore.Mvc;
-using static System.Collections.Specialized.BitVector32;
 
 namespace VideoProcessorFunction
 {
