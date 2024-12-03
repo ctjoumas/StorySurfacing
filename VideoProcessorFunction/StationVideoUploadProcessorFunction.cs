@@ -702,6 +702,7 @@ namespace VideoProcessorFunction
             rootNode.AppendChild(newNode);
 
             // TODO: If HearstShare is true, this may not be a PKG so we may need to add the type to Cosmos when video is first uploaded
+            // if we need this, this might be in the title case of the EnpsUtility
             newNode = doc.CreateElement("videoGenre");
             newNode.InnerText = "PKG";
             rootNode.AppendChild(newNode);
@@ -827,6 +828,7 @@ namespace VideoProcessorFunction
 
             List<string> topicsList = topicsPart.Split('|')
                                                 .Select(topic => topic.Trim())
+                                                .Where(topic => !string.IsNullOrEmpty(topic))
                                                 .ToList();
             
             var service = new CosmosDbService<Story>();
