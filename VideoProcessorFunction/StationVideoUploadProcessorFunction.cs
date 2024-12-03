@@ -180,7 +180,16 @@ namespace VideoProcessorFunction
             ILogger log,
             BlobProperties properties)
         {
-            await TriggerHandler(name, uri, log, properties);
+            try
+            {
+                log.LogInformation("Start WeshUploadTrigger");
+                await TriggerHandler(name, uri, log, properties);
+                log.LogInformation("End WeshUploadTrigger");
+            }
+            catch (Exception ex)
+            {
+                log.LogError(ex.ToString());
+            }
         }
 
         [FunctionName("WcvbUploadTrigger")]
@@ -192,7 +201,16 @@ namespace VideoProcessorFunction
             ILogger log,
             BlobProperties properties)
         {
-            await TriggerHandler(name, uri, log, properties);
+            try
+            {
+                log.LogInformation("Start WcvbUploadTrigger");
+                await TriggerHandler(name, uri, log, properties);
+                log.LogInformation("End WcvbUploadTrigger");
+            }
+            catch (Exception ex)
+            {
+                log.LogError(ex.ToString());
+            }
         }
 
         [FunctionName("KcraUploadTrigger")]
@@ -204,7 +222,16 @@ namespace VideoProcessorFunction
             ILogger log,
             BlobProperties properties)
         {
-            await TriggerHandler(name, uri, log, properties);
+            try
+            {
+                log.LogInformation("Start KcraUploadTrigger");
+                await TriggerHandler(name, uri, log, properties);
+                log.LogInformation("End KcraUploadTrigger");
+            }
+            catch (Exception ex)
+            {
+                log.LogError(ex.ToString());
+            }
         }
 
         [FunctionName("WmurUploadTrigger")]
@@ -216,7 +243,16 @@ namespace VideoProcessorFunction
             ILogger log,
             BlobProperties properties)
         {
-            await TriggerHandler(name, uri, log, properties);
+            try
+            {
+                log.LogInformation("Start WmurUploadTrigger");
+                await TriggerHandler(name, uri, log, properties);
+                log.LogInformation("End WmurUploadTrigger");
+            }
+            catch (Exception ex)
+            {
+                log.LogError(ex.ToString());
+            }
         }
 
         private static async Task TriggerHandler(string name, Uri uri, ILogger log, BlobProperties properties)
@@ -272,11 +308,10 @@ namespace VideoProcessorFunction
                         EnpsVideoTimestamp = enpsUtility.VideoTimestamp
                     };
 
+                    log.LogInformation($"Creating item in Cosmos DB for video {name} from station {station}");
                     await cosmosDbService.CreateItemAsync(story);
                 }
             }
-
-            log.LogInformation("End Storage A Video Upload Trigger");
         }
 
         /// <summary>
@@ -385,7 +420,7 @@ namespace VideoProcessorFunction
             }
             catch (Exception ex)
             {
-                log.LogInformation(ex.ToString());
+                log.LogError(ex.ToString());
                 throw;
             }
         }

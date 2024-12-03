@@ -108,7 +108,7 @@
             }
             else
             {
-                log.LogInformation("Error");
+                log.LogInformation("Error logging into ENPS");
             }
         }
 
