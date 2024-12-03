@@ -25,6 +25,7 @@ using VideoProcessorFunction.Services;
 using System.Linq;
 using Newtonsoft.Json;
 using Microsoft.AspNetCore.Mvc;
+using static System.Collections.Specialized.BitVector32;
 
 namespace VideoProcessorFunction
 {
@@ -59,9 +60,11 @@ namespace VideoProcessorFunction
             log.LogInformation("Done ENPS login");
         }
 
-        [FunctionName("LlmResponsTest")]
-        public static async Task<IActionResult> LlmResponsTest([HttpTrigger(authLevel: AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req, ILogger log)
+        [FunctionName("LlmResponseTest")]
+        public static async Task<IActionResult> LlmResponseTest([HttpTrigger(authLevel: AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req, ILogger log)
         {
+            string ofInterestToStations = Environment.GetEnvironmentVariable("Stations");
+
             string allStationTopics = @"
                 {
                 ""stationTopics"": [
@@ -74,11 +77,27 @@ namespace VideoProcessorFunction
                         ]
                     },
                     {
-                        ""stationName"": ""NYC"",
+                        ""stationName"": ""WMUR"",
                         ""topics"": [
                             ""Sports"",
                             ""Crime"",
                             ""Politics""
+                        ]
+                    },
+                    {
+                        ""stationName"": ""KCRA"",
+                        ""topics"": [
+                            ""Weather"",
+                            ""Shopping"",
+                            ""Entertainment""
+                        ]
+                    },
+                    {
+                        ""stationName"": ""WMUR"",
+                        ""topics"": [
+                            ""Entertainment"",
+                            ""Crime"",
+                            ""Stock Market""
                         ]
                     }
                 ]
@@ -96,6 +115,17 @@ namespace VideoProcessorFunction
 
             var azureOpenAIService = new AzureOpenAIService();
             var response = await azureOpenAIService.GetChatResponseWithRetryAsync(allStationTopics, videoTopics);
+
+            // The response will come back from the LLM as the following JSON:
+            // { "interestedStations":["WESH", "WMUR", "KCRA"]}
+            // Deserialize the JSON string into a dictionary
+            var jsonObject = JsonConvert.DeserializeObject<Dictionary<string, List<string>>>(response);
+
+            // extract the interestedStations array
+            List<string> interestedStations = jsonObject["interestedStations"];
+
+            string commaSeparatedStations = string.Join(",", interestedStations);
+
             return new OkObjectResult(response);
         }
 
@@ -109,11 +139,29 @@ namespace VideoProcessorFunction
         [FunctionName("TestIndexVideo")]
         public static async Task IndexVideoTest([HttpTrigger(authLevel: AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req, ILogger log)
         {
+            // The stations available are:
+            // - WESH
+            // - WMUR
+            // - WCVB
+            // - KCRA
+            //
+            // The video name and the Video Indexer video id of this video are passed into the request. The four available vidoes to test with are:
+            // - 4525002_US_NY_Diddy_Court_AP_Explains_CR__x040n.mp4
+            // - 4525038_US_IL_Bird_Migration_Building_Collisions_CR__x040n.mp4  (this video has the hearst share set)
+            // - 4524569_US_IL_Ex_House_Speaker_Trial_AP_Explains_CR__x040n.mp4
+            // - 4524674_US_Climate_Hurricane_Milton_AP_Explains_CR__x040n.mp4
+            //
+            // You will need to check your Video Indexer resource for the corresponding video ids
+
+            string stationName = req.Query["stationName"];
+            string videoName = req.Query["videoName"];
+            string videoId = req.Query["videoId"];
+
             EnpsUtility enpsUtility = new EnpsUtility();
             await enpsUtility.Login(log);
 
             // call search to populate ENPS Video Path, slug, and other pieces of information needed for the XML file
-            await enpsUtility.Search("4525038_US_IL_Bird_Migration_Building_Collisions_CR__x040n.mp4", log);
+            await enpsUtility.Search(videoName, log);
 
             DateTime storyModifiedDate = enpsUtility.StoryDateTime;
 
@@ -124,20 +172,26 @@ namespace VideoProcessorFunction
 
             var cosmosDbService = new CosmosDbService<Story>();
 
+            // This mimics when a video is first uploaded, before it is processed by Video Indexer, adding the Cosmos DB entry
+            // with an empty topics list. The topics list will get updated after the Video Indexer callback, which we'll mimic below
             var story = new Story
             {
                 Id = Guid.NewGuid().ToString(),
-                PartitionKey = "station-a",
-                VideoName = "4525038_US_IL_Bird_Migration_Building_Collisions_CR__x040n.mp4",
+                PartitionKey = stationName,
+                VideoName = videoName,
                 Topics = new List<string> { "", "", "" },
-                VideoId = "vsmnbeuuiz",
-                StoryDateTime = DateTime.Now,
+                VideoId = videoId,
+                StoryDateTime = enpsUtility.StoryDateTime,
+                EnpsVideoTimestamp = enpsUtility.VideoTimestamp,
+                EnpsSlug = enpsUtility.Slug,
+                EnpsMediaObject = enpsUtility.MediaObject,
+                EnpsFromPerson = enpsUtility.FromPerson,
                 EnpsHearstShare = enpsUtility.HearstShare
             };
 
             await cosmosDbService.CreateItemAsync(story);
             //await IndexVideoMetadata(req.Query["state"], req.Query["id"], log);
-            await ProcessVideo(req.Query["state"], req.Query["id"], log);
+            await ProcessVideo(videoId, log);
             
             //await cosmosDbService.CreateItemAsync(story);
 
@@ -162,7 +216,7 @@ namespace VideoProcessorFunction
                 // If video is processed
                 if (req.Query["state"].Equals(ProcessingState.Processed.ToString()))
                 {
-                    await ProcessVideo(req.Query["state"], req.Query["id"], log);
+                    await ProcessVideo(req.Query["id"], log);
                 }
                 else if (req.Query["state"].Equals(ProcessingState.Failed.ToString()))
                 {
@@ -508,7 +562,7 @@ namespace VideoProcessorFunction
         /// for processing.
         /// </summary>
         /// <returns></returns>
-        private static async Task ProcessVideo(string processingState, string videoId, ILogger log)
+        private static async Task ProcessVideo(string videoId, ILogger log)
         {
             // we don't have the video name and will need to get it from Video Indexer, so let's do that first
             // Build Azure Video Indexer resource provider client that has access token throuhg ARM
@@ -564,9 +618,9 @@ namespace VideoProcessorFunction
             if (blobClient.Exists())
             {
                 await blobClient.DeleteAsync();
-            }
 
-            log.LogInformation($"Video {videoName} deleted from storage account.");
+                log.LogInformation($"Video {videoName} deleted from storage account.");
+            }            
 
             // Now that we have the full JSON from Video Indexer, extract the topics and keywords for the XML file
             videoIndexerResourceProviderClient.ProcessMetadata(videoGetIndexResult, log);
@@ -613,8 +667,6 @@ namespace VideoProcessorFunction
             string videoTimestamp,
             ILogger logger)
         {
-            //var inputStations = Environment.GetEnvironmentVariable("Stations");
-            //var stations = inputStations.Split('|').ToList();
             logger.LogInformation($"Creating Hearst XML for station {stationName}");
             XmlDocument doc = new XmlDocument();
 
@@ -682,28 +734,37 @@ namespace VideoProcessorFunction
             rootNode.AppendChild(newNode);
 
             // AI topic comparison to each station AI index
-            // TODO: Test
             string ofInterestToStations = string.Empty;            
             if (!forceShare)
             {
                 string allStationTopics = await GetStationTopicsAsync(stationName);
+
                 AzureOpenAIService azureOpenAIService = new AzureOpenAIService();
                 var response = await azureOpenAIService.GetChatResponseWithRetryAsync(allStationTopics, topics);
 
-                // TODO: pull out stations of interested from the response
-                // ofInterestToStations = response....
+                // The response will come back from the LLM as the following JSON:
+                // { "interestedStations":["WESH", "WMUR", "KCRA"]}
+                // Deserialize the JSON string into a dictionary
+                var jsonObject = JsonConvert.DeserializeObject<Dictionary<string, List<string>>>(response);
+
+                // extract the interestedStations array
+                List<string> interestedStations = jsonObject["interestedStations"];
+
+                // remove the current station from this list because this station originated the video and is sharing with all over stations
+                interestedStations.Remove(stationName);
+
+                ofInterestToStations = string.Join(",", interestedStations);
             }
             else
             {
-                // TODO: add all stations to maybe an OfInterestToStations env variable for the function app
-                // ofInterestToStations = Environment.GetEnvironmentVariable("OfInterestToStations");
+                // Grab all stations from the stations environment variable
+                ofInterestToStations = Environment.GetEnvironmentVariable("Stations");
+
+                // remove the current station from this list because this station originated the video and is sharing with all over stations
+                ofInterestToStations = ofInterestToStations.Replace(stationName, "");
             }
 
-            // this is hardcoded now for WESH, but this will be updated in the future to account for other stations
-            // based on their location and the area of interest / location of the story
             newNode = doc.CreateElement("ofInterestTo");
-            // TODO: add stations from above TODO
-            //newNode.InnerText = "WESH WCVB WBAL";
             newNode.InnerText = ofInterestToStations;
             rootNode.AppendChild(newNode);
 
@@ -764,7 +825,7 @@ namespace VideoProcessorFunction
         {
             var topicsPart = topics.Split(':')[1].Trim();
 
-            List<string> topicsList = topicsPart.Split(' ')
+            List<string> topicsList = topicsPart.Split('|')
                                                 .Select(topic => topic.Trim())
                                                 .ToList();
             

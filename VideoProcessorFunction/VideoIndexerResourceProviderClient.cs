@@ -202,7 +202,7 @@ namespace VideoProcessorFunction
                         (metadataType.Equals("faces") && !metadataTypeToken[metadataField].ToString().Contains("Unknown")))
                     {
                         sbMetadataType.Append(metadataTypeToken[metadataField]);
-                        sbMetadataType.Append(" ");
+                        sbMetadataType.Append("|");
                     }
                 }
             }
