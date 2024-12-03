@@ -39,8 +39,29 @@ namespace VideoProcessorFunction.Services
 
         public async Task<T> CreateItemAsync(T item)
         {
-            // TODO: Add check to ensure we aren't creating a duplicate item
-            // Partition Name: StationName & video
+            var videoName = item.GetType().GetProperty("VideoName")?.GetValue(item, null);
+            var queryDefinition = new QueryDefinition(
+                    "SELECT * FROM c WHERE c.stationName = @partitionKey AND c.VideoName = @videoName")
+                .WithParameter("@partitionKey", item.PartitionKey)
+                .WithParameter("@videoName", videoName);
+
+            var queryIterator = _container.GetItemQueryIterator<T>(
+                queryDefinition,
+                requestOptions: new QueryRequestOptions
+                {
+                    PartitionKey = new PartitionKey(item.PartitionKey)
+                }
+            );
+
+            var existingItem = await queryIterator.ReadNextAsync();
+
+            if (existingItem.Any())
+            {
+                // Item already exists, return the existing item
+                return existingItem.First();
+            }
+
+            // Item doesn't exist, proceed to create the new item
             var response = await _container.CreateItemAsync(item, new PartitionKey(item.PartitionKey));
             return response.Resource;
         }
