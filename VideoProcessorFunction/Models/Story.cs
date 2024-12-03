@@ -8,7 +8,7 @@ namespace VideoProcessorFunction.Models
     {
         [Newtonsoft.Json.JsonProperty(PropertyName = "id")]
         public string Id { get; set; }
-        [Newtonsoft.Json.JsonProperty(PropertyName = "stationName")]
+        [Newtonsoft.Json.JsonProperty(PropertyName = "StationName")]
         public string PartitionKey { get; set; }
         public string VideoName { get; set; }
         public string VideoId { get; set; }
