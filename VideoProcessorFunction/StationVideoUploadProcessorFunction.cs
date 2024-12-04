@@ -603,9 +603,12 @@ namespace VideoProcessorFunction
 
             log.LogInformation($"Here is the full JSON of the indexed video for video ID {videoId}: \n{videoGetIndexResult}");
 
-            // ask GPT-4 to see if a name is embedded in the video overview text and return any network affiliation
-            //var azureOpenAIService = new AzureOpenAIService();
-            //var possibleNetworkAffiliation = await azureOpenAIService.SearchNetworkAffiliationAsync(story.VideoOverviewText);
+            if (!string.IsNullOrWhiteSpace(story.VideoOverviewText))
+            {
+                // ask GPT-4 to see if a name is embedded in the video overview text and return any network affiliation
+                //var azureOpenAIService = new AzureOpenAIService();
+                //var possibleNetworkAffiliation = await azureOpenAIService.SearchNetworkAffiliationAsync(story.VideoOverviewText);
+            }
 
             var stationName = story.PartitionKey;
 
