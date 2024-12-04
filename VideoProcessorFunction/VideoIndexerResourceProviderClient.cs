@@ -1,16 +1,16 @@
-﻿namespace VideoProcessorFunction
-{
-    using Azure.Core;
-    using Azure.Identity;
-    using System;
-    using System.Net.Http.Headers;
-    using System.Net.Http;
-    using System.Text;
-    using System.Threading.Tasks;
-    using System.Text.Json.Serialization;
-    using Microsoft.Extensions.Logging;
-    using Newtonsoft.Json.Linq;
+﻿using Azure.Core;
+using Azure.Identity;
+using System;
+using System.Net.Http.Headers;
+using System.Net.Http;
+using System.Text;
+using System.Threading.Tasks;
+using Microsoft.Extensions.Logging;
+using Newtonsoft.Json.Linq;
+using VideoProcessorFunction.Models;
 
+namespace VideoProcessorFunction
+{
     internal class VideoIndexerResourceProviderClient
     {
         private const string AzureResourceManager = "https://management.azure.com";
@@ -202,7 +202,7 @@
                         (metadataType.Equals("faces") && !metadataTypeToken[metadataField].ToString().Contains("Unknown")))
                     {
                         sbMetadataType.Append(metadataTypeToken[metadataField]);
-                        sbMetadataType.Append(" ");
+                        sbMetadataType.Append("|");
                     }
                 }
             }
@@ -226,26 +226,5 @@
                 throw new Exception(response.ToString());
             }
         }
-    }
-
-    public class AccountProperties
-    {
-        [JsonPropertyName("accountId")]
-        public string Id { get; set; }
-    }
-
-    public class Account
-    {
-        [JsonPropertyName("properties")]
-        public AccountProperties Properties { get; set; }
-
-        [JsonPropertyName("location")]
-        public string Location { get; set; }
-    }
-
-    public class GenerateAccessTokenResponse
-    {
-        [JsonPropertyName("accessToken")]
-        public string AccessToken { get; set; }
     }
 }

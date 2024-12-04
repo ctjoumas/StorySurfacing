@@ -1,5 +1,4 @@
-﻿using Azure.Core;
-using Azure.Identity;
+﻿using Azure.Identity;
 using Microsoft.Azure.Cosmos;
 using System;
 using System.Collections.Generic;
@@ -20,7 +19,7 @@ namespace VideoProcessorFunction.Services
         private static string CosmosDatabaseName = Environment.GetEnvironmentVariable("CosmosDatabaseName");
         private static string CosmosContainerName = Environment.GetEnvironmentVariable("CosmosContainerName");
         private static string CosmosAccountUri = Environment.GetEnvironmentVariable("CosmosAccountUri");
-        private static string CosmosConnectionString = Environment.GetEnvironmentVariable("CosmosDbConnectionString");
+        private static string TenantId = Environment.GetEnvironmentVariable("TenantId");
 
         public CosmosDbService()
         {
@@ -29,7 +28,7 @@ namespace VideoProcessorFunction.Services
                 tokenCredential: new DefaultAzureCredential(
                     new DefaultAzureCredentialOptions
                     {
-                        TenantId = "16b3c013-d300-468d-ac64-7eda0820b6d3",
+                        TenantId = TenantId,
                         ExcludeEnvironmentCredential = true
                     })
             );
@@ -40,6 +39,29 @@ namespace VideoProcessorFunction.Services
 
         public async Task<T> CreateItemAsync(T item)
         {
+            var videoName = item.GetType().GetProperty("VideoName")?.GetValue(item, null);
+            var queryDefinition = new QueryDefinition(
+                    "SELECT * FROM c WHERE c.stationName = @partitionKey AND c.VideoName = @videoName")
+                .WithParameter("@partitionKey", item.PartitionKey)
+                .WithParameter("@videoName", videoName);
+
+            var queryIterator = _container.GetItemQueryIterator<T>(
+                queryDefinition,
+                requestOptions: new QueryRequestOptions
+                {
+                    PartitionKey = new PartitionKey(item.PartitionKey)
+                }
+            );
+
+            var existingItem = await queryIterator.ReadNextAsync();
+
+            if (existingItem.Any())
+            {
+                // Item already exists, return the existing item
+                return existingItem.First();
+            }
+
+            // Item doesn't exist, proceed to create the new item
             var response = await _container.CreateItemAsync(item, new PartitionKey(item.PartitionKey));
             return response.Resource;
         }
