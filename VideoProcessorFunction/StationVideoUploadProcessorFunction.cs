@@ -113,7 +113,7 @@ namespace VideoProcessorFunction
             ";
 
             var azureOpenAIService = new AzureOpenAIService();
-            var response = await azureOpenAIService.GetChatResponseWithRetryAsync(allStationTopics, videoTopics);
+            var response = await azureOpenAIService.MatchStationsToVideoTopicsAsync(allStationTopics, videoTopics);
 
             // The response will come back from the LLM as the following JSON:
             // { "interestedStations":["WESH", "WMUR", "KCRA"]}
@@ -739,7 +739,7 @@ namespace VideoProcessorFunction
                 string allStationTopics = await GetStationTopicsAsync(stationName);
 
                 AzureOpenAIService azureOpenAIService = new AzureOpenAIService();
-                var response = await azureOpenAIService.GetChatResponseWithRetryAsync(allStationTopics, topics);
+                var response = await azureOpenAIService.MatchStationsToVideoTopicsAsync(allStationTopics, topics);
 
                 // The response will come back from the LLM as the following JSON:
                 // { "interestedStations":["WESH", "WMUR", "KCRA"]}

@@ -1,16 +1,16 @@
-﻿namespace VideoProcessorFunction.Services
-{
-    using Newtonsoft.Json.Linq;
-    using Newtonsoft.Json;
-    using Polly;
-    using Polly.Retry;
-    using System;
-    using System.Net.Http;
-    using System.Text;
-    using System.Threading;
-    using System.Threading.Tasks;
-    using VideoProcessorFunction.Schemas;
+﻿using Newtonsoft.Json.Linq;
+using Newtonsoft.Json;
+using Polly;
+using Polly.Retry;
+using System;
+using System.Net.Http;
+using System.Text;
+using System.Threading;
+using System.Threading.Tasks;
+using VideoProcessorFunction.Schemas;
 
+namespace VideoProcessorFunction.Services
+{
     public class AzureOpenAIService
     {
         private string SystemPrompt = @"
@@ -59,7 +59,6 @@
         private readonly string _apiKey;
         private readonly ISchemaLoader _schemaLoader;
         private static readonly SemaphoreSlim semaphore = new SemaphoreSlim(5); // Limit concurrency to 5 requests
-        private readonly HttpClient _retryClient;
 
         // Retry policy with exponential backoff using Polly
         private static readonly AsyncRetryPolicy<HttpResponseMessage> retryPolicy = Policy
@@ -95,7 +94,7 @@
         /// <param name="allStationTopics">JSON list of stations and the topics they have been broadcasting recently</param>
         /// <param name="videoTopics">JSON list of topics present in the given video</param>
         /// <returns>A JSON list of stations interested in the given video topics</returns>
-        public async Task<string> GetChatResponseWithRetryAsync(string allStationTopics, string videoTopics)
+        public async Task<string> MatchStationsToVideoTopicsAsync(string allStationTopics, string videoTopics)
         {
             // Ensure semaphore is in place for controlling concurrency
             await semaphore.WaitAsync();
@@ -105,7 +104,6 @@
                 // Wrap the API call with the retry policy to handle transient errors
                 var httpResponse = await retryPolicy.ExecuteAsync(async () =>
                 {
-                    //using HttpClient client = _httpClientFactory.CreateClient();
                     using HttpClient client = new HttpClient();
                     client.DefaultRequestHeaders.Add("api-key", _apiKey);
 
@@ -147,6 +145,61 @@
                 JObject jsonResponse = JObject.Parse(responseContent);
 
                 // Extract the content from the message inside choices[0]
+                var messageContent = jsonResponse["choices"]?[0]?["message"]?["content"]?.ToString();
+
+                return messageContent;
+            }
+            finally
+            {
+                // Release the semaphore once the request is complete
+                semaphore.Release();
+            }
+        }
+
+        public async Task<string> SearchNetworkAffiliationAsync(string videoText)
+        {
+            // Ensure semaphore is in place for controlling concurrency
+            await semaphore.WaitAsync();
+
+            try
+            {
+                // Wrap the API call with the retry policy to handle transient errors
+                var httpResponse = await retryPolicy.ExecuteAsync(async () =>
+                {
+                    using HttpClient client = new HttpClient();
+                    client.DefaultRequestHeaders.Add("api-key", _apiKey);
+
+                    // Define the request payload for a chat completion
+                    var requestPayload = new
+                    {
+                        messages = new[]
+                        {
+                        new { role = "system", content = "You are a news outlet AI assistant that identifies the network a person works for." },
+                        new { role = "user", content = $"Find a person's name in this text. The network this person works for is not in the text so please find out which network this person works for and respond with only that network: {videoText}" }
+                        },
+                        max_tokens = 4096,  // Define the maximum number of tokens
+                        temperature = 0.7,  // Optional, controls randomness of the response
+                    };
+
+                    // Serialize the payload to JSON
+                    var jsonPayload = JsonConvert.SerializeObject(requestPayload);
+
+                    var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+
+                    // Send POST request
+                    var response = await client.PostAsync(_azureOpenAIUrl, content);
+
+                    return response;
+                });
+
+                // Get the response content
+                var responseContent = await httpResponse.Content.ReadAsStringAsync();
+
+                // Parse the JSON response
+                JObject jsonResponse = JObject.Parse(responseContent);
+
+                // Extract the content from the message inside choices[0]
+                //string possibleNetworkAffiliatoin = completions.Choices != null ? completions.Choices[0].Message.Content : "Unknown network affiliation";
                 var messageContent = jsonResponse["choices"]?[0]?["message"]?["content"]?.ToString();
 
                 return messageContent;
