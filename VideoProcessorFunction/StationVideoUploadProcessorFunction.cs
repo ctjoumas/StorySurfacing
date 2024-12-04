@@ -365,7 +365,8 @@ namespace VideoProcessorFunction
                         EnpsSlug = enpsUtility.Slug,
                         EnpsMediaObject = enpsUtility.MediaObject,
                         EnpsFromPerson = enpsUtility.FromPerson,
-                        EnpsVideoTimestamp = enpsUtility.VideoTimestamp
+                        EnpsVideoTimestamp = enpsUtility.VideoTimestamp,
+                        VideoOverviewText = enpsUtility.VideoOverviewText
                     };
 
                     log.LogInformation($"Creating item in Cosmos DB for video {name} from station {station}");
@@ -603,13 +604,9 @@ namespace VideoProcessorFunction
             log.LogInformation($"Here is the full JSON of the indexed video for video ID {videoId}: \n{videoGetIndexResult}");
 
             // ask GPT-4 to see if a name is embedded in the video overview text and return any network affiliation
-            // COMMENTING OUT FOR TESTING WITHOUT ENPS SERVER
-            //PersonNetworkAffiliationUtility personNetworkAffiliationUtility = new PersonNetworkAffiliationUtility();
-            //string possibleNetworkAffiliation = await personNetworkAffiliationUtility.SearchNetworkAffiliationUsingChatGpt4(enpsUtility.VideoOverviewText);*/
-            //string possibleNetworkAffiliation = "NBC";
+            //var azureOpenAIService = new AzureOpenAIService();
+            //var possibleNetworkAffiliation = await azureOpenAIService.SearchNetworkAffiliationAsync(story.VideoOverviewText);
 
-            //var service = new CosmosDbService<Story>();
-            //var story = await service.GetItemAsync("VideoName", videoName);
             var stationName = story.PartitionKey;
 
             // once the video is processed, we no longer need it in the storage account - TODO: ADD CONTAINER NAME FOR VIDEOS TO APP CONFIG

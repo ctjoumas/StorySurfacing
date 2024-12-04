@@ -38,5 +38,10 @@ namespace VideoProcessorFunction.Models
         /// Determines whether the story is set to be shared with all stations or not.
         /// </summary>
         public bool EnpsHearstShare { get; set; }
+
+        /// <summary>
+        // The overview text of the video
+        /// </summary>
+        public string VideoOverviewText { get; set; }
     }
 }
