@@ -1,15 +1,10 @@
 using System;
 using System.IO;
 using System.Threading.Tasks;
-using Microsoft.Azure.WebJobs;
 using Microsoft.Extensions.Logging;
 using System.Net.Http;
 using System.Collections.Generic;
 using System.Web;
-using Azure.Storage.Blobs;
-using Azure.Storage.Sas;
-using Azure.Storage.Blobs.Models;
-using Microsoft.Azure.WebJobs.Extensions.Http;
 using Microsoft.AspNetCore.Http;
 using Azure.Core;
 using Azure.Identity;
@@ -24,12 +19,20 @@ using VideoProcessorFunction.Models;
 using VideoProcessorFunction.Services;
 using System.Linq;
 using Newtonsoft.Json;
+using Microsoft.Azure.Functions.Worker;
+using Microsoft.Azure.Functions.Worker.Extensions.Storage;
+using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Mvc;
+using Azure.Storage.Blobs.Models;
+using Azure.Storage.Blobs;
+using Azure.Storage.Sas;
 
 namespace VideoProcessorFunction
 {
-    public static class StationVideoUploadProcessorFunction
+    public class StationVideoUploadProcessorFunction
     {
+        private readonly ILogger _logger;
+
         private const string AzureResourceManager = "https://management.azure.com";
 
         private const string ApiUrl = "https://api.videoindexer.ai";
@@ -45,22 +48,27 @@ namespace VideoProcessorFunction
 
         private static string StationAContainerName = Environment.GetEnvironmentVariable("StationAContainerName");
 
-        [FunctionName("TestEnpsConnectivity")]
-        public static async Task EnpsConnectivityTest([HttpTrigger(authLevel:AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req, ILogger log)
+        public StationVideoUploadProcessorFunction(ILoggerFactory loggerFactory)
+        {
+            _logger = loggerFactory.CreateLogger<StationVideoUploadProcessorFunction>();
+        }
+
+        [Function("TestEnpsConnectivity")]
+        public async Task EnpsConnectivityTest([HttpTrigger(authLevel:AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req)
         {
             var stations = Environment.GetEnvironmentVariable("Stations");
 
             var enpsUtility = new EnpsUtility();
 
-            log.LogInformation("Attempting to log into ENPS Server on VM...");
+            _logger.LogInformation("Attempting to log into ENPS Server on VM...");
 
-            await enpsUtility.Login(log);
+            await enpsUtility.Login(_logger);
 
-            log.LogInformation("Done ENPS login");
+            _logger.LogInformation("Done ENPS login");
         }
 
-        [FunctionName("LlmResponseTest")]
-        public static async Task<IActionResult> LlmResponseTest([HttpTrigger(authLevel: AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req, ILogger log)
+        [Function("LlmResponseTest")]
+        public static async Task<IActionResult> LlmResponseTest([HttpTrigger(authLevel: AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req)
         {
             string ofInterestToStations = Environment.GetEnvironmentVariable("Stations");
 
@@ -135,8 +143,8 @@ namespace VideoProcessorFunction
         /// <param name="req"></param>
         /// <param name="log"></param>
         /// <returns></returns>
-        [FunctionName("TestIndexVideo")]
-        public static async Task IndexVideoTest([HttpTrigger(authLevel: AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req, ILogger log)
+        [Function("TestIndexVideo")]
+        public async Task IndexVideoTest([HttpTrigger(authLevel: AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req)
         {
             // The stations available are:
             // - WESH
@@ -157,15 +165,15 @@ namespace VideoProcessorFunction
             string videoId = req.Query["videoId"];
 
             EnpsUtility enpsUtility = new EnpsUtility();
-            await enpsUtility.Login(log);
+            await enpsUtility.Login(_logger);
 
             // call search to populate ENPS Video Path, slug, and other pieces of information needed for the XML file
-            await enpsUtility.Search(videoName, log);
+            await enpsUtility.Search(videoName, _logger);
 
             DateTime storyModifiedDate = enpsUtility.StoryDateTime;
 
             // calls the ENPS BasicContent endpoint which will get the text overview of the video
-            await enpsUtility.GetBasicContent(log);
+            await enpsUtility.GetBasicContent(_logger);
 
             Console.WriteLine(enpsUtility.HearstShare);
 
@@ -185,12 +193,13 @@ namespace VideoProcessorFunction
                 EnpsSlug = enpsUtility.Slug,
                 EnpsMediaObject = enpsUtility.MediaObject,
                 EnpsFromPerson = enpsUtility.FromPerson,
-                EnpsHearstShare = enpsUtility.HearstShare
+                EnpsHearstShare = enpsUtility.HearstShare,
+                VideoOverviewText = enpsUtility.VideoOverviewText
             };
 
             await cosmosDbService.CreateItemAsync(story);
             //await IndexVideoMetadata(req.Query["state"], req.Query["id"], log);
-            await ProcessVideo(videoId, log);
+            await ProcessVideo(videoId);
             
             //await cosmosDbService.CreateItemAsync(story);
 
@@ -205,21 +214,21 @@ namespace VideoProcessorFunction
         /// </summary>
         /// <param name="req">POST request from Video Indexer</param>
         /// <param name="log">Logger</param>
-        [FunctionName("GetVideoStatus")]
-        public static async Task ReceiveVideoIndexerStateUpdate([HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequest req, ILogger log)
+        [Function("GetVideoStatus")]
+        public async Task ReceiveVideoIndexerStateUpdate([HttpTrigger(AuthorizationLevel.Function, "post")] HttpRequest req)
         {
             try
             {
-                log.LogInformation($"Received Video Indexer status update - Video ID: {req.Query["id"]} \t Processing State: {req.Query["state"]}");
+                _logger.LogInformation($"Received Video Indexer status update - Video ID: {req.Query["id"]} \t Processing State: {req.Query["state"]}");
 
                 // If video is processed
                 if (req.Query["state"].Equals(ProcessingState.Processed.ToString()))
                 {
-                    await ProcessVideo(req.Query["id"], log);
+                    await ProcessVideo(req.Query["id"]);
                 }
                 else if (req.Query["state"].Equals(ProcessingState.Failed.ToString()))
                 {
-                    log.LogInformation($"\nThe video index failed for video ID {req.Query["id"]}.");
+                    _logger.LogInformation($"\nThe video index failed for video ID {req.Query["id"]}.");
                     var service = new CosmosDbService<Story>();
                     var story = await service.GetItemAsync("VideoId", req.Query["id"]);
                     await service.DeleteItemAsync(story.Id, story.PartitionKey);
@@ -227,108 +236,104 @@ namespace VideoProcessorFunction
             }
             catch(Exception ex)
             {
-                log.LogError(ex.ToString());
+                _logger.LogError(ex.ToString());
             }
         }
 
-        [FunctionName("WeshUploadTrigger")]
-        public static async Task WeshUploadTrigger(
+        [Function("WeshUploadTrigger")]
+        public async Task WeshUploadTrigger(
             [BlobTrigger("wesh/{name}",
             Connection = "StorageConnectionString")] Stream videoBlob,
             string name,
             Uri uri,
-            ILogger log,
             BlobProperties properties)
         {
             try
             {
-                log.LogInformation("Start WeshUploadTrigger");
-                await TriggerHandler(name, uri, log, properties);
-                log.LogInformation("End WeshUploadTrigger");
+                _logger.LogInformation("Start WeshUploadTrigger");
+                await TriggerHandler(name, uri, properties);
+                _logger.LogInformation("End WeshUploadTrigger");
             }
             catch (Exception ex)
             {
-                log.LogError(ex.ToString());
+                _logger.LogError(ex.ToString());
             }
         }
 
-        [FunctionName("WcvbUploadTrigger")]
-        public static async Task WcvbUploadTrigger(
+        [Function("WcvbUploadTrigger")]
+        public async Task WcvbUploadTrigger(
             [BlobTrigger("wcvb/{name}",
             Connection = "StorageConnectionString")] Stream videoBlob,
             string name,
             Uri uri,
-            ILogger log,
             BlobProperties properties)
         {
             try
             {
-                log.LogInformation("Start WcvbUploadTrigger");
-                await TriggerHandler(name, uri, log, properties);
-                log.LogInformation("End WcvbUploadTrigger");
+                _logger.LogInformation("Start WcvbUploadTrigger");
+                await TriggerHandler(name, uri, properties);
+                _logger.LogInformation("End WcvbUploadTrigger");
             }
             catch (Exception ex)
             {
-                log.LogError(ex.ToString());
+                _logger.LogError(ex.ToString());
             }
         }
 
-        [FunctionName("KcraUploadTrigger")]
-        public static async Task KcraUploadTrigger(
+        [Function("KcraUploadTrigger")]
+        public async Task KcraUploadTrigger(
             [BlobTrigger("kcra/{name}",
             Connection = "StorageConnectionString")] Stream videoBlob,
             string name,
             Uri uri,
-            ILogger log,
             BlobProperties properties)
         {
             try
             {
-                log.LogInformation("Start KcraUploadTrigger");
-                await TriggerHandler(name, uri, log, properties);
-                log.LogInformation("End KcraUploadTrigger");
+                _logger.LogInformation("Start KcraUploadTrigger");
+                await TriggerHandler(name, uri, properties);
+                _logger.LogInformation("End KcraUploadTrigger");
             }
             catch (Exception ex)
             {
-                log.LogError(ex.ToString());
+                _logger.LogError(ex.ToString());
             }
         }
 
-        [FunctionName("WmurUploadTrigger")]
-        public static async Task WmurUploadTrigger(
+        [Function("WmurUploadTrigger")]
+        public async Task WmurUploadTrigger(
             [BlobTrigger("wmur/{name}",
             Connection = "StorageConnectionString")] Stream videoBlob,
             string name,
             Uri uri,
-            ILogger log,
             BlobProperties properties)
         {
             try
             {
-                log.LogInformation("Start WmurUploadTrigger");
-                await TriggerHandler(name, uri, log, properties);
-                log.LogInformation("End WmurUploadTrigger");
+                _logger.LogInformation("Start WmurUploadTrigger");
+                await TriggerHandler(name, uri, properties);
+                _logger.LogInformation("End WmurUploadTrigger");
             }
             catch (Exception ex)
             {
-                log.LogError(ex.ToString());
+                _logger.LogError(ex.ToString());
             }
         }
 
-        private static async Task TriggerHandler(string name, Uri uri, ILogger log, BlobProperties properties)
+        private async Task TriggerHandler(string name, Uri uri, BlobProperties properties)
         {
             // we first need to check ENPS to ensure this is a PKG and return back the pieces of information we need to include in
             // the database so when videos are pulled up from trend search results, it will have the path to the video on the ENPS
             // server as well as the overview text of the video, including any possible network affiliation if an anchor's name
             // exists in the overview text
             var enpsUtility = new EnpsUtility();
-            await enpsUtility.Login(log);
-            bool processVideo = await enpsUtility.Search(name, log);
+            await enpsUtility.Login(_logger);
+            bool processVideo = await enpsUtility.Search(name, _logger);
 
             // The above processVideo determines if the video is not more than a day old and is a PKG; but if Hearst determines
             // that the video should be shared to all stations, the HearstShare property will be set to true and the video will be
             // processed regardless of the above conditions. We get the HearstShare property from the ENPS BasicContent call
-            await enpsUtility.GetBasicContent(log);
+            await enpsUtility.GetBasicContent(_logger);
 
             bool forceShare = enpsUtility.HearstShare;
 
@@ -341,17 +346,17 @@ namespace VideoProcessorFunction
                 DateTime currentTimeMinusTenMinutesEst = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow.AddMinutes(-TIME_THRESHOLD), easternZone);
                 DateTime blobCreatedDateTimeEst = TimeZoneInfo.ConvertTimeFromUtc(properties.CreatedOn.DateTime, easternZone);
 
-                log.LogInformation($"Blob created on: {blobCreatedDateTimeEst}  ====== Current time minus {TIME_THRESHOLD} mins: {currentTimeMinusTenMinutesEst}");
+                _logger.LogInformation($"Blob created on: {blobCreatedDateTimeEst}  ====== Current time minus {TIME_THRESHOLD} mins: {currentTimeMinusTenMinutesEst}");
 
                 if (!forceShare || (blobCreatedDateTimeEst < currentTimeMinusTenMinutesEst))
                 {
-                    log.LogInformation($"Blob trigger function for Station A SKIPPING blob\n Name: {name} because it was uploaded more than {TIME_THRESHOLD} minutes ago.");
+                    _logger.LogInformation($"Blob trigger function for Station A SKIPPING blob\n Name: {name} because it was uploaded more than {TIME_THRESHOLD} minutes ago.");
                 }
                 else
                 {
-                    log.LogInformation($"Blob trigger function for Station A processed blob\n Name: {name} from path: {uri}.");
+                    _logger.LogInformation($"Blob trigger function for Station A processed blob\n Name: {name} from path: {uri}.");
 
-                    await ProcessBlobTrigger(name, log);
+                    await ProcessBlobTrigger(name, _logger);
 
                     var cosmosDbService = new CosmosDbService<Story>();
                     var station = new BlobUriBuilder(uri).BlobContainerName;
@@ -369,7 +374,7 @@ namespace VideoProcessorFunction
                         VideoOverviewText = enpsUtility.VideoOverviewText
                     };
 
-                    log.LogInformation($"Creating item in Cosmos DB for video {name} from station {station}");
+                    _logger.LogInformation($"Creating item in Cosmos DB for video {name} from station {station}");
                     await cosmosDbService.CreateItemAsync(story);
                 }
             }
@@ -562,19 +567,19 @@ namespace VideoProcessorFunction
         /// for processing.
         /// </summary>
         /// <returns></returns>
-        private static async Task ProcessVideo(string videoId, ILogger log)
+        private async Task ProcessVideo(string videoId)
         {
             // we don't have the video name and will need to get it from Video Indexer, so let's do that first
             // Build Azure Video Indexer resource provider client that has access token throuhg ARM
             var videoIndexerResourceProviderClient = await VideoIndexerResourceProviderClient.BuildVideoIndexerResourceProviderClient();
 
             // Get account details
-            var account = await videoIndexerResourceProviderClient.GetAccount(log);
+            var account = await videoIndexerResourceProviderClient.GetAccount(_logger);
             var accountLocation = account.Location;
             var accountId = account.Properties.Id;
 
             // Get account level access token for Azure Video Indexer 
-            var accountAccessToken = await videoIndexerResourceProviderClient.GetAccessToken(ArmAccessTokenPermission.Contributor, ArmAccessTokenScope.Account, log);
+            var accountAccessToken = await videoIndexerResourceProviderClient.GetAccessToken(ArmAccessTokenPermission.Contributor, ArmAccessTokenScope.Account, _logger);
 
             string queryParams = CreateQueryString(
                 new Dictionary<string, string>()
@@ -601,7 +606,7 @@ namespace VideoProcessorFunction
             Story story = await cosmosDbService.GetItemAsync("VideoId", videoId);
             string videoName = story.VideoName;
 
-            log.LogInformation($"Here is the full JSON of the indexed video for video ID {videoId}: \n{videoGetIndexResult}");
+            _logger.LogInformation($"Here is the full JSON of the indexed video for video ID {videoId}: \n{videoGetIndexResult}");
 
             if (!string.IsNullOrWhiteSpace(story.VideoOverviewText))
             {
@@ -618,11 +623,11 @@ namespace VideoProcessorFunction
             {
                 await blobClient.DeleteAsync();
 
-                log.LogInformation($"Video {videoName} deleted from storage account.");
+                _logger.LogInformation($"Video {videoName} deleted from storage account.");
             }            
 
             // Now that we have the full JSON from Video Indexer, extract the topics and keywords for the XML file
-            videoIndexerResourceProviderClient.ProcessMetadata(videoGetIndexResult, log);
+            videoIndexerResourceProviderClient.ProcessMetadata(videoGetIndexResult, _logger);
           
             // create the XML document that will feed back into ENPS
             string topics = videoIndexerResourceProviderClient.Topics;
@@ -635,7 +640,7 @@ namespace VideoProcessorFunction
             string keywords = videoIndexerResourceProviderClient.Keywords;
             //string mosXml = "<mos><itemID>2</itemID><itemSlug>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</itemSlug><objID>fae8d129-2374-4aa3-bfa0-51532fbc076c</objID><mosID>BC.PRECIS2.WESH.HEARST.MOS</mosID><mosAbstract>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</mosAbstract><abstract>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</abstract><objDur>5580</objDur><objTB>60</objTB><objSlug>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</objSlug><objType>VIDEO</objType><objPaths><objPath>https://WESH-CONT1.companynet.org:10456/broadcast/fae8d129-2374-4aa3-bfa0-51532fbc076c.mxf</objPath><objProxyPath techDescription=\"Proxy\">https://WESH-CONT1.companynet.org:10456/proxy/fae8d129-2374-4aa3-bfa0-51532fbc076cProxy.mp4</objProxyPath><objProxyPath techDescription=\"JPG\">https://WESH-CONT1.companynet.org:10456/still/fae8d129-2374-4aa3-bfa0-51532fbc076c.jpg</objProxyPath></objPaths><mosExternalMetadata><mosScope>STORY</mosScope><mosSchema>http://bitcentral.com/schemas/mos/2.0</mosSchema><mosPayload /></mosExternalMetadata><itemChannel>X</itemChannel><objAir>NOT READY</objAir></mos>";
             //string videoTimestamp = DateTime.Now.ToString();
-            await CreateEnpsXmlDocument(story.EnpsHearstShare, stationName, topics, keywords, story.EnpsSlug, story.EnpsMediaObject, stationName, story.EnpsFromPerson, story.EnpsVideoTimestamp, log);
+            await CreateEnpsXmlDocument(story.EnpsHearstShare, stationName, topics, keywords, story.EnpsSlug, story.EnpsMediaObject, stationName, story.EnpsFromPerson, story.EnpsVideoTimestamp);
         }
 
         /// <summary>
@@ -654,7 +659,7 @@ namespace VideoProcessorFunction
         /// </hearstXML>
         /// <param name="forceShare">From the ENPS system for this video, signifying if this video should be shared regardless of other conditions</param>
         /// </summary>
-        private static async Task CreateEnpsXmlDocument(
+        private async Task CreateEnpsXmlDocument(
             bool forceShare, 
             string stationName, 
             string topics, 
@@ -663,10 +668,9 @@ namespace VideoProcessorFunction
             string mosXml, 
             string fromStation, 
             string fromPerson, 
-            string videoTimestamp,
-            ILogger logger)
+            string videoTimestamp)
         {
-            logger.LogInformation($"Creating Hearst XML for station {stationName}");
+            _logger.LogInformation($"Creating Hearst XML for station {stationName}");
             XmlDocument doc = new XmlDocument();
 
             XmlNode newNode = doc.CreateElement("hearstXML");
@@ -768,7 +772,7 @@ namespace VideoProcessorFunction
             newNode.InnerText = ofInterestToStations;
             rootNode.AppendChild(newNode);
 
-            logger.LogInformation($"End creating Hearst XML for station {stationName}");
+            _logger.LogInformation($"End creating Hearst XML for station {stationName}");
             using (MemoryStream xmlStream = new MemoryStream())
             {
                 using (var ftpClient = new FtpClient(new FtpClientConfiguration
@@ -783,7 +787,7 @@ namespace VideoProcessorFunction
                     await ftpClient.LoginAsync();
                     using var writeStream = await ftpClient.OpenFileWriteStreamAsync($"{messageId}.xml");
                     doc.Save(writeStream);
-                    logger.LogInformation($"XML document {messageId}.xml uploaded to FTP server");
+                    _logger.LogInformation($"XML document {messageId}.xml uploaded to FTP server");
                 }
             }
         }
