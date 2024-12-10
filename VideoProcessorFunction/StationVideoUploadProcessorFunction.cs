@@ -1,9 +1,4 @@
-using System;
-using System.IO;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using System.Net.Http;
-using System.Collections.Generic;
 using System.Web;
 using Microsoft.AspNetCore.Http;
 using Azure.Core;
@@ -17,16 +12,12 @@ using System.Globalization;
 using CoreFtp;
 using VideoProcessorFunction.Models;
 using VideoProcessorFunction.Services;
-using System.Linq;
 using Newtonsoft.Json;
 using Microsoft.Azure.Functions.Worker;
-using Microsoft.Azure.Functions.Worker.Extensions.Storage;
-using Microsoft.Extensions.Configuration;
 using Microsoft.AspNetCore.Mvc;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs;
 using Azure.Storage.Sas;
-using static System.Collections.Specialized.BitVector32;
 
 namespace VideoProcessorFunction
 {
@@ -46,9 +37,6 @@ namespace VideoProcessorFunction
 
         // Connection string to the storage account
         private static string StorageAccountConnectionString = Environment.GetEnvironmentVariable("StorageConnectionString");
-
-        private static string StationAContainerName = Environment.GetEnvironmentVariable("StationAContainerName");
-
         private readonly StationService _stationService;
 
         public StationVideoUploadProcessorFunction(
@@ -372,8 +360,8 @@ namespace VideoProcessorFunction
             // the database so when videos are pulled up from trend search results, it will have the path to the video on the ENPS
             // server as well as the overview text of the video, including any possible network affiliation if an anchor's name
             // exists in the overview text
-            var station = new BlobUriBuilder(uri).BlobContainerName;
-            var serverAddress = _stationService.GetServerAddress(station);
+            var stationName = new BlobUriBuilder(uri).BlobContainerName;
+            var serverAddress = _stationService.GetServerAddress(stationName);
             var enpsUtility = new EnpsUtility();
             await enpsUtility.Login(_logger);
             bool processVideo = await enpsUtility.Search(name, serverAddress, _logger);
@@ -404,14 +392,14 @@ namespace VideoProcessorFunction
                 {
                     _logger.LogInformation($"Blob trigger function for Station A processed blob\n Name: {name} from path: {uri}.");
 
-                    await ProcessBlobTrigger(name, _logger);
+                    await ProcessBlobTrigger(name, stationName, _logger);
 
                     var cosmosDbService = new CosmosDbService<Story>();
 
                     var story = new Story
                     {
                         Id = Guid.NewGuid().ToString(),
-                        PartitionKey = station,
+                        PartitionKey = stationName,
                         VideoName = name,
                         StoryDateTime = enpsUtility.StoryDateTime,
                         EnpsSlug = enpsUtility.Slug,
@@ -421,7 +409,7 @@ namespace VideoProcessorFunction
                         VideoOverviewText = enpsUtility.VideoOverviewText
                     };
 
-                    _logger.LogInformation($"Creating item in Cosmos DB for video {name} from station {station}");
+                    _logger.LogInformation($"Creating item in Cosmos DB for video {name} from station {stationName}");
                     await cosmosDbService.CreateItemAsync(story);
                 }
             }
@@ -434,13 +422,13 @@ namespace VideoProcessorFunction
         /// <param name="functionCallbackUrl">The video indexer callback URL which is called when the video completes processing</param>
         /// <param name="log"></param>
         /// <returns></returns>
-        private static async Task ProcessBlobTrigger(string name, ILogger log)
+        private static async Task ProcessBlobTrigger(string name, string containerName, ILogger log)
         {
-            BlobClient blobClient = new BlobClient(StorageAccountConnectionString, StationAContainerName, name);
+            BlobClient blobClient = new BlobClient(StorageAccountConnectionString, containerName, name);
 
             BlobSasBuilder sasBuilder = new BlobSasBuilder()
             {
-                BlobContainerName = StationAContainerName,
+                BlobContainerName = containerName,
                 BlobName = name,
                 Resource = "b",
             };
