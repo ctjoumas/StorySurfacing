@@ -26,6 +26,7 @@ using Microsoft.AspNetCore.Mvc;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs;
 using Azure.Storage.Sas;
+using static System.Collections.Specialized.BitVector32;
 
 namespace VideoProcessorFunction
 {
@@ -48,9 +49,14 @@ namespace VideoProcessorFunction
 
         private static string StationAContainerName = Environment.GetEnvironmentVariable("StationAContainerName");
 
-        public StationVideoUploadProcessorFunction(ILoggerFactory loggerFactory)
+        private readonly StationService _stationService;
+
+        public StationVideoUploadProcessorFunction(
+            ILoggerFactory loggerFactory, 
+            StationService stationService)
         {
             _logger = loggerFactory.CreateLogger<StationVideoUploadProcessorFunction>();
+            _stationService = stationService;
         }
 
         [Function("TestEnpsConnectivity")]
@@ -166,9 +172,9 @@ namespace VideoProcessorFunction
 
             EnpsUtility enpsUtility = new EnpsUtility();
             await enpsUtility.Login(_logger);
-
+            var serverAddress = _stationService.GetServerAddress(stationName);
             // call search to populate ENPS Video Path, slug, and other pieces of information needed for the XML file
-            await enpsUtility.Search(videoName, _logger);
+            await enpsUtility.Search(videoName,serverAddress, _logger);
 
             DateTime storyModifiedDate = enpsUtility.StoryDateTime;
 
@@ -326,9 +332,11 @@ namespace VideoProcessorFunction
             // the database so when videos are pulled up from trend search results, it will have the path to the video on the ENPS
             // server as well as the overview text of the video, including any possible network affiliation if an anchor's name
             // exists in the overview text
+            var station = new BlobUriBuilder(uri).BlobContainerName;
+            var serverAddress = _stationService.GetServerAddress(station);
             var enpsUtility = new EnpsUtility();
             await enpsUtility.Login(_logger);
-            bool processVideo = await enpsUtility.Search(name, _logger);
+            bool processVideo = await enpsUtility.Search(name, serverAddress, _logger);
 
             // The above processVideo determines if the video is not more than a day old and is a PKG; but if Hearst determines
             // that the video should be shared to all stations, the HearstShare property will be set to true and the video will be
@@ -359,7 +367,6 @@ namespace VideoProcessorFunction
                     await ProcessBlobTrigger(name, _logger);
 
                     var cosmosDbService = new CosmosDbService<Story>();
-                    var station = new BlobUriBuilder(uri).BlobContainerName;
 
                     var story = new Story
                     {

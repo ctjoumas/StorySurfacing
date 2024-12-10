@@ -1,12 +1,7 @@
 ﻿using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Net.Http;
 using System.Text;
-using System.Threading.Tasks;
 
 namespace VideoProcessorFunction
 {
@@ -57,10 +52,6 @@ namespace VideoProcessorFunction
         /// regardless of the rules we have in place (i.e. share even if it's not a PKG, is a day older, etc)
         /// </summary>
         public bool HearstShare { get; set; }
-
-        // THIS WILL BE AN APP CONFIG VALUE FOR THE ENPS SERVER
-        //private string ServerAddress = "http://WESH-CONT1.companynet.org:10456/proxy/";
-        private string ServerAddress = "http://video-server/proxy/";
 
         /// <summary>
         /// Logs into the ENPS Server in order to retrieve the SessionID, which will be used for the subsequent search requests
@@ -118,7 +109,7 @@ namespace VideoProcessorFunction
         /// bodyContent QueryTerms below.
         /// </summary>
         /// <returns>true if the video is a story (type 3) and also a PKG</returns>
-        public async Task<bool> Search(string videoProxyName, ILogger log)
+        public async Task<bool> Search(string videoProxyName, string serverAddress, ILogger log)
         {
             bool isVideoStoryAndPkg = false;
 
@@ -135,7 +126,7 @@ namespace VideoProcessorFunction
                 "     \"SearchTrash\": false," +
                 "     \"SearchWIP\": true" +
                 "   }]," +
-                " \"QueryTerms\": \"" + ServerAddress + videoProxyName + "\"," +
+                " \"QueryTerms\": \"" + serverAddress + videoProxyName + "\"," +
                 " \"SortByRank\": false," +
                 " \"SearchWires\": false," +
                 " \"zFields\": []" +
