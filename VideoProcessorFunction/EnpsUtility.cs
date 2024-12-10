@@ -113,6 +113,8 @@ namespace VideoProcessorFunction
         {
             bool isVideoStoryAndPkg = false;
 
+            log.LogInformation($"Searching for video: {videoProxyName} serverAddress: { serverAddress}");
+
             string bodyContent = "" +
                 "{" +
                 " \"Database\": \"ENPS\"," +
@@ -141,6 +143,7 @@ namespace VideoProcessorFunction
 
             if (response.IsSuccessStatusCode)
             {
+                log.LogInformation($"Success searching for video: {videoProxyName} serverAddress: {serverAddress}");
                 var contentString = await response.Content.ReadAsStringAsync();
 
                 JObject searchResultsJsonObject = JObject.Parse(contentString);

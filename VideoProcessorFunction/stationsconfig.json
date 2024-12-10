@@ -1,12 +1,36 @@
 {
   "StationsConfig": {
     "Stations": {
-      "wesh": { "ServerAddress": "http://video-server/proxy/" },
-      "wmur": { "ServerAddress": "http://video-server/proxy/" },
-      "wcvb": { "ServerAddress": "http://video-server/proxy/" },
-      "kcra": { "ServerAddress": "http://video-server/proxy/" },
-      "wxii": { "ServerAddress": "http://video-server/proxy/" },
-      "kcci": { "ServerAddress": "http://video-server/proxy/" }
+      "wesh": {
+        "ServerAddress": "http://video-server/proxy/",
+        "Database": "",
+        "Basepath": ""
+      },
+      "wmur": {
+        "ServerAddress": "http://video-server/proxy/",
+        "Database": "",
+        "Basepath": ""
+      },
+      "wcvb": {
+        "ServerAddress": "http://video-server/proxy/",
+        "Database": "",
+        "Basepath": ""
+      },
+      "kcra": {
+        "ServerAddress": "http://video-server/proxy/",
+        "Database": "",
+        "Basepath": ""
+      },
+      "wxii": {
+        "ServerAddress": "http://video-server/proxy/",
+        "Database": "",
+        "Basepath": ""
+      },
+      "kcci": {
+        "ServerAddress": "http://video-server/proxy/",
+        "Database": "",
+        "Basepath": ""
+      }
     }
   }
 }
