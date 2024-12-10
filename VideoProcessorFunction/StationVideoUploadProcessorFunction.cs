@@ -326,6 +326,46 @@ namespace VideoProcessorFunction
             }
         }
 
+        [Function("WxiiUploadTrigger")]
+        public async Task WxiiUploadTrigger(
+            [BlobTrigger("wxii/{name}",
+            Connection = "StorageConnectionString")] Stream videoBlob,
+            string name,
+            Uri uri,
+            BlobProperties properties)
+        {
+            try
+            {
+                _logger.LogInformation("Start WxiiUploadTrigger");
+                await TriggerHandler(name, uri, properties);
+                _logger.LogInformation("End WxiiUploadTrigger");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex.ToString());
+            }
+        }
+
+        [Function("KcciUploadTrigger")]
+        public async Task KcciUploadTrigger(
+            [BlobTrigger("kcci/{name}",
+            Connection = "StorageConnectionString")] Stream videoBlob,
+            string name,
+            Uri uri,
+            BlobProperties properties)
+        {
+            try
+            {
+                _logger.LogInformation("Start KcciUploadTrigger");
+                await TriggerHandler(name, uri, properties);
+                _logger.LogInformation("End KcciUploadTrigger");
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex.ToString());
+            }
+        }
+
         private async Task TriggerHandler(string name, Uri uri, BlobProperties properties)
         {
             // we first need to check ENPS to ensure this is a PKG and return back the pieces of information we need to include in
