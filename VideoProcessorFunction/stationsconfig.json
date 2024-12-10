@@ -3,8 +3,8 @@
     "Stations": {
       "wesh": {
         "ServerAddress": "http://video-server/proxy/",
-        "Database": "",
-        "Basepath": ""
+        "Database": "aaa",
+        "Basepath": "aaa"
       },
       "wmur": {
         "ServerAddress": "http://video-server/proxy/",
