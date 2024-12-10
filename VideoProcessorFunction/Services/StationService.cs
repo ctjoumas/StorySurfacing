@@ -30,5 +30,7 @@ namespace VideoProcessorFunction.Services
             }
             throw new ArgumentNullException(nameof(stationName), "Station not found");
         }
+
+        public Dictionary<string, Station> GetStations() => _stationsConfig?.Stations;
     }
 }

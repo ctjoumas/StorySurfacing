@@ -50,8 +50,6 @@ namespace VideoProcessorFunction
         [Function("TestEnpsConnectivity")]
         public async Task EnpsConnectivityTest([HttpTrigger(authLevel:AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req)
         {
-            var stations = Environment.GetEnvironmentVariable("Stations");
-
             var enpsUtility = new EnpsUtility();
 
             _logger.LogInformation("Attempting to log into ENPS Server on VM...");
@@ -64,8 +62,6 @@ namespace VideoProcessorFunction
         [Function("LlmResponseTest")]
         public static async Task<IActionResult> LlmResponseTest([HttpTrigger(authLevel: AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req)
         {
-            string ofInterestToStations = Environment.GetEnvironmentVariable("Stations");
-
             string allStationTopics = @"
                 {
                 ""stationTopics"": [
@@ -796,11 +792,9 @@ namespace VideoProcessorFunction
             }
             else
             {
-                // Grab all stations from the stations environment variable
-                ofInterestToStations = Environment.GetEnvironmentVariable("Stations");
-
-                // remove the current station from this list because this station originated the video and is sharing with all over stations
-                ofInterestToStations = ofInterestToStations.Replace(stationName, "");
+                var stations = _stationService.GetStations();
+                var filtered = stations.Where(s => s.Key != stationName).Select(s => s.Key).ToList();
+                ofInterestToStations = string.Join(",", filtered);
             }
 
             newNode = doc.CreateElement("ofInterestTo");
