@@ -18,6 +18,7 @@ using Microsoft.AspNetCore.Mvc;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs;
 using Azure.Storage.Sas;
+using Azure;
 
 namespace VideoProcessorFunction
 {
@@ -235,33 +236,33 @@ namespace VideoProcessorFunction
             [BlobTrigger("wesh/{name}",
             Connection = "StorageConnectionString")] Stream videoBlob,
             string name,
-            Uri uri,
-            BlobProperties properties)
+            Uri uri)
         {
             try
-            {
+            {               
                 _logger.LogInformation("Start WeshUploadTrigger");
-                await TriggerHandler(name, uri, properties);
+                Response<BlobProperties> properties = await GetBlobProperties(name, uri);
+                await TriggerHandler(name, uri, properties.Value.CreatedOn);
                 _logger.LogInformation("End WeshUploadTrigger");
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex.ToString());
             }
-        }
+        }        
 
         [Function("WcvbUploadTrigger")]
         public async Task WcvbUploadTrigger(
             [BlobTrigger("wcvb/{name}",
             Connection = "StorageConnectionString")] Stream videoBlob,
             string name,
-            Uri uri,
-            BlobProperties properties)
+            Uri uri)
         {
             try
-            {
+            {                
                 _logger.LogInformation("Start WcvbUploadTrigger");
-                await TriggerHandler(name, uri, properties);
+                Response<BlobProperties> properties = await GetBlobProperties(name, uri);
+                await TriggerHandler(name, uri, properties.Value.CreatedOn);
                 _logger.LogInformation("End WcvbUploadTrigger");
             }
             catch (Exception ex)
@@ -275,13 +276,13 @@ namespace VideoProcessorFunction
             [BlobTrigger("kcra/{name}",
             Connection = "StorageConnectionString")] Stream videoBlob,
             string name,
-            Uri uri,
-            BlobProperties properties)
+            Uri uri)
         {
             try
             {
                 _logger.LogInformation("Start KcraUploadTrigger");
-                await TriggerHandler(name, uri, properties);
+                Response<BlobProperties> properties = await GetBlobProperties(name, uri);
+                await TriggerHandler(name, uri, properties.Value.CreatedOn);
                 _logger.LogInformation("End KcraUploadTrigger");
             }
             catch (Exception ex)
@@ -295,13 +296,13 @@ namespace VideoProcessorFunction
             [BlobTrigger("wmur/{name}",
             Connection = "StorageConnectionString")] Stream videoBlob,
             string name,
-            Uri uri,
-            BlobProperties properties)
+            Uri uri)
         {
             try
             {
                 _logger.LogInformation("Start WmurUploadTrigger");
-                await TriggerHandler(name, uri, properties);
+                Response<BlobProperties> properties = await GetBlobProperties(name, uri);
+                await TriggerHandler(name, uri, properties.Value.CreatedOn);
                 _logger.LogInformation("End WmurUploadTrigger");
             }
             catch (Exception ex)
@@ -315,13 +316,13 @@ namespace VideoProcessorFunction
             [BlobTrigger("wxii/{name}",
             Connection = "StorageConnectionString")] Stream videoBlob,
             string name,
-            Uri uri,
-            BlobProperties properties)
+            Uri uri)
         {
             try
             {
                 _logger.LogInformation("Start WxiiUploadTrigger");
-                await TriggerHandler(name, uri, properties);
+                Response<BlobProperties> properties = await GetBlobProperties(name, uri);
+                await TriggerHandler(name, uri, properties.Value.CreatedOn);
                 _logger.LogInformation("End WxiiUploadTrigger");
             }
             catch (Exception ex)
@@ -335,13 +336,13 @@ namespace VideoProcessorFunction
             [BlobTrigger("kcci/{name}",
             Connection = "StorageConnectionString")] Stream videoBlob,
             string name,
-            Uri uri,
-            BlobProperties properties)
+            Uri uri)
         {
             try
             {
                 _logger.LogInformation("Start KcciUploadTrigger");
-                await TriggerHandler(name, uri, properties);
+                Response<BlobProperties> properties = await GetBlobProperties(name, uri);
+                await TriggerHandler(name, uri, properties.Value.CreatedOn);
                 _logger.LogInformation("End KcciUploadTrigger");
             }
             catch (Exception ex)
@@ -350,7 +351,10 @@ namespace VideoProcessorFunction
             }
         }
 
-        private async Task TriggerHandler(string name, Uri uri, BlobProperties properties)
+        private async Task TriggerHandler(
+            string name, 
+            Uri uri, 
+            DateTimeOffset createdOn)
         {
             // we first need to check ENPS to ensure this is a PKG and return back the pieces of information we need to include in
             // the database so when videos are pulled up from trend search results, it will have the path to the video on the ENPS
@@ -376,7 +380,7 @@ namespace VideoProcessorFunction
 
                 // get the current time minus the specified threshold and blob created time in EST
                 DateTime currentTimeMinusTenMinutesEst = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow.AddMinutes(-TIME_THRESHOLD), easternZone);
-                DateTime blobCreatedDateTimeEst = TimeZoneInfo.ConvertTimeFromUtc(properties.CreatedOn.DateTime, easternZone);
+                DateTime blobCreatedDateTimeEst = TimeZoneInfo.ConvertTimeFromUtc(createdOn.DateTime, easternZone);
 
                 _logger.LogInformation($"Blob created on: {blobCreatedDateTimeEst}  ====== Current time minus {TIME_THRESHOLD} mins: {currentTimeMinusTenMinutesEst}");
 
@@ -868,6 +872,15 @@ namespace VideoProcessorFunction
             story.VideoId = videoId;
             story.Topics = topicsList;
             await service.UpdateItemAsync(story);
+        }
+
+        private static async Task<Response<BlobProperties>> GetBlobProperties(string name, Uri uri)
+        {
+            var containerName = new BlobUriBuilder(uri).BlobContainerName;
+            var connectionString = Environment.GetEnvironmentVariable("StorageConnectionString");
+            var blobClient = new BlobClient(connectionString, containerName, name);
+            var properties = await blobClient.GetPropertiesAsync();
+            return properties;
         }
     }
 }
