@@ -32,5 +32,25 @@ namespace VideoProcessorFunction.Services
         }
 
         public Dictionary<string, Station> GetStations() => _stationsConfig?.Stations;
+
+        public string GetDatabase(string stationName)
+        {
+            if (_stationsConfig?.Stations?.TryGetValue(stationName, out var station) == true)
+            {
+                return station.Database;
+            }
+
+            throw new ArgumentNullException(nameof(stationName), "Station not found");
+        }
+
+        public string GetBasepath(string stationName)
+        {
+            if (_stationsConfig?.Stations?.TryGetValue(stationName, out var station) == true)
+            {
+                return station.Basepath;
+            }
+
+            throw new ArgumentNullException(nameof(stationName), "Station not found");
+        }
     }
 }
