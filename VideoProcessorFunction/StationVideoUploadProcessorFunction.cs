@@ -384,7 +384,7 @@ namespace VideoProcessorFunction
 
                 _logger.LogInformation($"Blob created on: {blobCreatedDateTimeEst}  ====== Current time minus {TIME_THRESHOLD} mins: {currentTimeMinusTenMinutesEst}");
 
-                if (!forceShare || (blobCreatedDateTimeEst < currentTimeMinusTenMinutesEst))
+                if (!forceShare && (blobCreatedDateTimeEst < currentTimeMinusTenMinutesEst))
                 {
                     _logger.LogInformation($"Blob trigger function for Station A SKIPPING blob\n Name: {name} because it was uploaded more than {TIME_THRESHOLD} minutes ago.");
                 }
@@ -392,13 +392,14 @@ namespace VideoProcessorFunction
                 {
                     _logger.LogInformation($"Blob trigger function for Station A processed blob\n Name: {name} from path: {uri}.");
 
-                    await ProcessBlobTrigger(name, stationName, _logger);
+                    var videoId = await ProcessBlobTrigger(name, stationName, _logger);
 
                     var cosmosDbService = new CosmosDbService<Story>();
 
                     var story = new Story
                     {
                         Id = Guid.NewGuid().ToString(),
+                        VideoId = videoId,
                         PartitionKey = stationName,
                         VideoName = name,
                         StoryDateTime = enpsUtility.StoryDateTime,
@@ -422,7 +423,7 @@ namespace VideoProcessorFunction
         /// <param name="functionCallbackUrl">The video indexer callback URL which is called when the video completes processing</param>
         /// <param name="log"></param>
         /// <returns></returns>
-        private static async Task ProcessBlobTrigger(string name, string containerName, ILogger log)
+        private static async Task<string> ProcessBlobTrigger(string name, string containerName, ILogger log)
         {
             BlobClient blobClient = new BlobClient(StorageAccountConnectionString, containerName, name);
 
@@ -460,7 +461,9 @@ namespace VideoProcessorFunction
             var accountAccessToken = await videoIndexerResourceProviderClient.GetAccessToken(/*client, */ArmAccessTokenPermission.Contributor, ArmAccessTokenScope.Account, log);
 
             // Upload the video
-            await UploadVideo(name, uri, accountLocation, accountId, accountAccessToken, client, log);
+            var videoId = await UploadVideo(name, uri, accountLocation, accountId, accountAccessToken, client, log);
+
+            return videoId;
         }
 
         /// <summary>
@@ -474,7 +477,7 @@ namespace VideoProcessorFunction
         /// <param name="client"></param>
         /// <param name="log"></param>
         /// <returns></returns>
-        private static async Task UploadVideo(string videoName, Uri videoUri, string accountLocation, string accountId, string accountAccessToken, HttpClient client, ILogger log)
+        private static async Task<string> UploadVideo(string videoName, Uri videoUri, string accountLocation, string accountId, string accountAccessToken, HttpClient client, ILogger log)
         {
             log.LogInformation($"Video is starting to upload with video name: {videoName}, videoUri: {videoUri}");
 
@@ -518,6 +521,8 @@ namespace VideoProcessorFunction
                 // Get the video ID from the upload result
                 var videoId = System.Text.Json.JsonSerializer.Deserialize<Video>(uploadResult).Id;
                 log.LogInformation($"\nVideo ID {videoId} was uploaded successfully");
+
+                return videoId;
             }
             catch (Exception ex)
             {
