@@ -90,12 +90,12 @@ namespace VideoProcessorFunction
             log.LogInformation("Request to Logon endpoint sent.");
             log.LogInformation($"Status code: {response.StatusCode}");
 
-            var contentString = await response.Content.ReadAsStringAsync();
-            Dictionary<string, object> logonResponse = JsonConvert.DeserializeObject<Dictionary<string, object>>(contentString);
-
             if (response.IsSuccessStatusCode)
             {
+                var contentString = await response.Content.ReadAsStringAsync();
+                Dictionary<string, object> logonResponse = JsonConvert.DeserializeObject<Dictionary<string, object>>(contentString);
                 EnpsSessionId = logonResponse["SessionID"] as string;
+                log.LogInformation($"Successfully logged into ENPS. SessionID: {EnpsSessionId}");
             }
             else
             {

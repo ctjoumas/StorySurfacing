@@ -67,7 +67,7 @@ namespace VideoProcessorFunction
                 {
                 ""stationTopics"": [
                     {
-                        ""stationName"": ""WESH"",
+                        ""stationName"": ""wesh"",
                         ""topics"": [
                             ""Sports"",
                             ""Weather"",
@@ -75,7 +75,7 @@ namespace VideoProcessorFunction
                         ]
                     },
                     {
-                        ""stationName"": ""WMUR"",
+                        ""stationName"": ""wmur"",
                         ""topics"": [
                             ""Sports"",
                             ""Crime"",
@@ -83,7 +83,7 @@ namespace VideoProcessorFunction
                         ]
                     },
                     {
-                        ""stationName"": ""KCRA"",
+                        ""stationName"": ""kcra"",
                         ""topics"": [
                             ""Weather"",
                             ""Shopping"",
@@ -91,7 +91,7 @@ namespace VideoProcessorFunction
                         ]
                     },
                     {
-                        ""stationName"": ""WMUR"",
+                        ""stationName"": ""wmur"",
                         ""topics"": [
                             ""Entertainment"",
                             ""Crime"",
@@ -138,10 +138,10 @@ namespace VideoProcessorFunction
         public async Task IndexVideoTest([HttpTrigger(authLevel: AuthorizationLevel.Anonymous, "get", "post", Route = null)] HttpRequest req)
         {
             // The stations available are:
-            // - WESH
-            // - WMUR
-            // - WCVB
-            // - KCRA
+            // - wesh
+            // - wmur
+            // - wcvb
+            // - kcra
             //
             // The video name and the Video Indexer video id of this video are passed into the request. The four available vidoes to test with are:
             // - 4525002_US_NY_Diddy_Court_AP_Explains_CR__x040n.mp4
@@ -166,7 +166,7 @@ namespace VideoProcessorFunction
             // calls the ENPS BasicContent endpoint which will get the text overview of the video
             await enpsUtility.GetBasicContent(_logger);
 
-            Console.WriteLine(enpsUtility.HearstShare);
+            _logger.LogInformation($"Hearst Share:{enpsUtility.HearstShare}");
 
             var cosmosDbService = new CosmosDbService<Story>();
 
@@ -189,12 +189,7 @@ namespace VideoProcessorFunction
             };
 
             await cosmosDbService.CreateItemAsync(story);
-            //await IndexVideoMetadata(req.Query["state"], req.Query["id"], log);
             await ProcessVideo(videoId);
-            
-            //await cosmosDbService.CreateItemAsync(story);
-
-            //await cosmosDbService.GetStationTopicsAsync();
         }
 
         /// <summary>
@@ -781,23 +776,30 @@ namespace VideoProcessorFunction
             string ofInterestToStations = string.Empty;            
             if (!forceShare)
             {
-                string allStationTopics = await GetStationTopicsAsync(stationName);
+                _logger.LogInformation($"Getting station topics for station {stationName}");
+                var allStationTopics = await GetStationTopicsAsync(stationName);
+                _logger.LogInformation($"Got station topics for station {stationName}. Topics: {allStationTopics}");
 
-                AzureOpenAIService azureOpenAIService = new AzureOpenAIService();
-                var response = await azureOpenAIService.MatchStationsToVideoTopicsAsync(allStationTopics, topics);
+                if (!string.IsNullOrWhiteSpace(allStationTopics))
+                {
+                    AzureOpenAIService azureOpenAIService = new AzureOpenAIService();
+                    _logger.LogInformation($"Calling Azure Open AI service to match stations to video topics for station {stationName}");
+                    var response = await azureOpenAIService.MatchStationsToVideoTopicsAsync(allStationTopics, topics);
+                    _logger.LogInformation($"Matched stations to video topics for station {stationName}. Response: {response}");
 
-                // The response will come back from the LLM as the following JSON:
-                // { "interestedStations":["WESH", "WMUR", "KCRA"]}
-                // Deserialize the JSON string into a dictionary
-                var jsonObject = JsonConvert.DeserializeObject<Dictionary<string, List<string>>>(response);
+                    // The response will come back from the LLM as the following JSON:
+                    // { "interestedStations":["WESH", "WMUR", "KCRA"]}
+                    // Deserialize the JSON string into a dictionary
+                    var jsonObject = JsonConvert.DeserializeObject<Dictionary<string, List<string>>>(response);
 
-                // extract the interestedStations array
-                List<string> interestedStations = jsonObject["interestedStations"];
+                    // extract the interestedStations array
+                    List<string> interestedStations = jsonObject["interestedStations"];
 
-                // remove the current station from this list because this station originated the video and is sharing with all over stations
-                interestedStations.Remove(stationName);
+                    // remove the current station from this list because this station originated the video and is sharing with all over stations
+                    interestedStations.Remove(stationName);
 
-                ofInterestToStations = string.Join(",", interestedStations);
+                    ofInterestToStations = string.Join(",", interestedStations);
+                }
             }
             else
             {
@@ -846,21 +848,25 @@ namespace VideoProcessorFunction
             var service = new CosmosDbService<Story>();
 
             var items = await service.GetStationTopicsAsync(excludedStation);
+            var stationTopics = string.Empty;
 
-            var projectedItems = items.Select(story => new
+            if (items.Any())
             {
-                stationName = story.PartitionKey,
-                topics = story.Topics
-            }).ToList();
+                var projectedItems = items.Select(story => new
+                {
+                    stationName = story.PartitionKey,
+                    topics = story.Topics
+                }).ToList();
 
-            var rootObject = new
-            {
-                stationTopics = projectedItems
-            };
+                var rootObject = new
+                {
+                    stationTopics = projectedItems
+                };
 
-            var json = JsonConvert.SerializeObject(rootObject, Newtonsoft.Json.Formatting.Indented);
-
-            return json;
+                stationTopics = JsonConvert.SerializeObject(rootObject, Newtonsoft.Json.Formatting.Indented);
+            }
+            
+            return stationTopics;
         }
 
         static async Task UpdateStationTopics(string videoId, string videoName, string topics)
