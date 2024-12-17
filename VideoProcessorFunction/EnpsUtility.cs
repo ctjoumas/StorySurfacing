@@ -204,8 +204,19 @@ namespace VideoProcessorFunction
 
                             case "title":
                                 int indexOfDash = fieldValue.IndexOf("-");
-                                Slug = fieldValue.Substring(0, indexOfDash);
-                                string type = fieldValue.Substring(indexOfDash + 1, fieldValue.Length - (indexOfDash + 1));
+
+                                string type = string.Empty;
+
+                                // there could a type from the producer or small variations in the title, so we need to check that the dash exists
+                                if (indexOfDash != -1)
+                                {
+                                    Slug = fieldValue.Substring(0, indexOfDash);
+                                    type = fieldValue.Substring(indexOfDash + 1, fieldValue.Length - (indexOfDash + 1));
+                                }
+                                else
+                                {
+                                    Slug = fieldValue;
+                                }
 
                                 if (type.Equals("PKG"))
                                 {
