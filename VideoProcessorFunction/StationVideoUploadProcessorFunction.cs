@@ -111,7 +111,7 @@ namespace VideoProcessorFunction
                 }
             ";
 
-            var azureOpenAIService = new AzureOpenAIService();
+            var azureOpenAIService = new AzureOpenAIService(null);
             var response = await azureOpenAIService.MatchStationsToVideoTopicsAsync(allStationTopics, videoTopics);
 
             // The response will come back from the LLM as the following JSON:
@@ -782,7 +782,7 @@ namespace VideoProcessorFunction
 
                 if (!string.IsNullOrWhiteSpace(allStationTopics))
                 {
-                    AzureOpenAIService azureOpenAIService = new AzureOpenAIService();
+                    AzureOpenAIService azureOpenAIService = new AzureOpenAIService(_logger);
                     _logger.LogInformation($"Calling Azure Open AI service to match stations to video topics for station {stationName}");
                     var response = await azureOpenAIService.MatchStationsToVideoTopicsAsync(allStationTopics, topics);
                     _logger.LogInformation($"Matched stations to video topics for station {stationName}. Response: {response}");

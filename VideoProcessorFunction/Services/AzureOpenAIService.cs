@@ -8,6 +8,7 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using VideoProcessorFunction.Schemas;
+using Microsoft.Extensions.Logging;
 
 namespace VideoProcessorFunction.Services
 {
@@ -57,6 +58,7 @@ namespace VideoProcessorFunction.Services
 
         private readonly string _azureOpenAIUrl;
         private readonly string _apiKey;
+        private readonly ILogger _logger;
         private readonly ISchemaLoader _schemaLoader;
         private static readonly SemaphoreSlim semaphore = new SemaphoreSlim(5); // Limit concurrency to 5 requests
 
@@ -72,8 +74,9 @@ namespace VideoProcessorFunction.Services
                 }
             );
 
-        public AzureOpenAIService()
+        public AzureOpenAIService(ILogger logger)
         {
+            _logger = logger;
             _apiKey = Environment.GetEnvironmentVariable("AzureOpenAIKey", EnvironmentVariableTarget.Process);
             var endPoint = Environment.GetEnvironmentVariable("AzureOpenAIEndpoint", EnvironmentVariableTarget.Process);
             var modelName = Environment.GetEnvironmentVariable("ModelName", EnvironmentVariableTarget.Process);
@@ -110,6 +113,8 @@ namespace VideoProcessorFunction.Services
                     SystemPrompt = SystemPrompt.Replace("{all_staton_topics}", allStationTopics);
                     SystemPrompt = SystemPrompt.Replace("{video_topics}", videoTopics);
 
+                    _logger.LogInformation("MatchStationsToVideoTopicsAsync: Creating request payload");
+
                     // Define the request payload for a chat completion
                     var requestPayload = new
                     {
@@ -127,8 +132,12 @@ namespace VideoProcessorFunction.Services
                         },
                     };
 
+                    _logger.LogInformation($"MatchStationsToVideoTopicsAsync: Finished created request payload: {requestPayload}");
+
                     // Serialize the payload to JSON
                     var jsonPayload = JsonConvert.SerializeObject(requestPayload);
+
+                    _logger.LogInformation($"MatchStationsToVideoTopicsAsync: Finished serializing request payload: {jsonPayload}");
 
                     var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
 
