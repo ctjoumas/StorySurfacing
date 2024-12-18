@@ -179,6 +179,7 @@ namespace VideoProcessorFunction
                 VideoName = videoName,
                 Topics = new List<string> { "", "", "" },
                 VideoId = videoId,
+                EnpsVideoType = enpsUtility.VideoType,
                 StoryDateTime = enpsUtility.StoryDateTime,
                 EnpsVideoTimestamp = enpsUtility.VideoTimestamp,
                 EnpsSlug = enpsUtility.Slug,
@@ -397,6 +398,7 @@ namespace VideoProcessorFunction
                         VideoId = videoId,
                         PartitionKey = stationName,
                         VideoName = name,
+                        EnpsVideoType = enpsUtility.VideoType,
                         StoryDateTime = enpsUtility.StoryDateTime,
                         EnpsSlug = enpsUtility.Slug,
                         EnpsMediaObject = enpsUtility.MediaObject,
@@ -672,10 +674,12 @@ namespace VideoProcessorFunction
                 await UpdateStationTopics(videoId, videoName, topics.Trim());
             }
 
+            string faces = videoIndexerResourceProviderClient.Faces;
             string keywords = videoIndexerResourceProviderClient.Keywords;
+
             //string mosXml = "<mos><itemID>2</itemID><itemSlug>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</itemSlug><objID>fae8d129-2374-4aa3-bfa0-51532fbc076c</objID><mosID>BC.PRECIS2.WESH.HEARST.MOS</mosID><mosAbstract>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</mosAbstract><abstract>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</abstract><objDur>5580</objDur><objTB>60</objTB><objSlug>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</objSlug><objType>VIDEO</objType><objPaths><objPath>https://WESH-CONT1.companynet.org:10456/broadcast/fae8d129-2374-4aa3-bfa0-51532fbc076c.mxf</objPath><objProxyPath techDescription=\"Proxy\">https://WESH-CONT1.companynet.org:10456/proxy/fae8d129-2374-4aa3-bfa0-51532fbc076cProxy.mp4</objProxyPath><objProxyPath techDescription=\"JPG\">https://WESH-CONT1.companynet.org:10456/still/fae8d129-2374-4aa3-bfa0-51532fbc076c.jpg</objProxyPath></objPaths><mosExternalMetadata><mosScope>STORY</mosScope><mosSchema>http://bitcentral.com/schemas/mos/2.0</mosSchema><mosPayload /></mosExternalMetadata><itemChannel>X</itemChannel><objAir>NOT READY</objAir></mos>";
             //string videoTimestamp = DateTime.Now.ToString();
-            await CreateEnpsXmlDocument(story.EnpsHearstShare, stationName, topics, keywords, story.EnpsSlug, story.EnpsMediaObject, stationName, story.EnpsFromPerson, story.EnpsVideoTimestamp);
+            await CreateEnpsXmlDocument(story.EnpsHearstShare, stationName, story.EnpsVideoType, topics, faces, keywords, story.EnpsSlug, story.EnpsMediaObject, stationName, story.EnpsFromPerson, story.EnpsVideoTimestamp);
         }
 
         /// <summary>
@@ -696,8 +700,10 @@ namespace VideoProcessorFunction
         /// </summary>
         private async Task CreateEnpsXmlDocument(
             bool forceShare, 
-            string stationName, 
-            string topics, 
+            string stationName,
+            string videoType,
+            string topics,
+            string faces,
             string keywords, 
             string slug, 
             string mosXml, 
@@ -739,10 +745,9 @@ namespace VideoProcessorFunction
             newNode.InnerXml = mosXml;
             rootNode.AppendChild(newNode);
 
-            // TODO: If HearstShare is true, this may not be a PKG so we may need to add the type to Cosmos when video is first uploaded
             // if we need this, this might be in the title case of the EnpsUtility
             newNode = doc.CreateElement("videoGenre");
-            newNode.InnerText = "PKG";
+            newNode.InnerText = videoType;
             rootNode.AppendChild(newNode);
 
             newNode = doc.CreateElement("fromStation");
@@ -871,9 +876,7 @@ namespace VideoProcessorFunction
 
         static async Task UpdateStationTopics(string videoId, string videoName, string topics)
         {
-            var topicsPart = topics.Split(':')[1].Trim();
-
-            List<string> topicsList = topicsPart.Split('|')
+            List<string> topicsList = topics.Split('|')
                                                 .Select(topic => topic.Trim())
                                                 .Where(topic => !string.IsNullOrEmpty(topic))
                                                 .ToList();

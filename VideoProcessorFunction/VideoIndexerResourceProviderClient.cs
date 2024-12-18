@@ -21,7 +21,10 @@ namespace VideoProcessorFunction
         private readonly string armAccessToken;
 
         public string Topics { get; set; }
+        public string Faces { get; set; }
         public string Keywords { get; set; }
+        public string Ocr { get; set; }
+        public string Transcript { get; set; }
 
         /// <summary>
         /// Builds the Video Indexer Resource Provider Client with the proper token for authorization.
@@ -129,7 +132,7 @@ namespace VideoProcessorFunction
             //string videoId = videoIndexerJsonObject.SelectToken("videos[0].id").ToString();
 
             /*
-               Create one single text vector to include:
+               If creating a text vector, include:
                [Video context]
                Topics of this video are: Politics, Sports
                Celebrities appearing in this video: LeBron James, MJ
@@ -137,45 +140,35 @@ namespace VideoProcessorFunction
                Transcript: ...
              */
 
-            StringBuilder sbTextVector = new StringBuilder();
-
-            // We are going to create embeddings from topics, labels, keywords, and faces
             string topics = GetMetadataFromVideoIndexer(videoIndexerJsonObject, "topics", "name");
             if (topics.Length > 0)
             {
-                sbTextVector.Append("Topics of this video are: ");
-                sbTextVector.Append(topics);
-
-                Topics += sbTextVector.ToString();
+                Topics = topics;
             }
 
             string faces = GetMetadataFromVideoIndexer(videoIndexerJsonObject, "faces", "name");
             if (faces.Length > 0)
             {
-                sbTextVector.Append("Celebrities appearing in this video: ");
-                sbTextVector.Append(faces);
-
-                Keywords += sbTextVector.ToString();
+                // remove Unknown faces (?) - TEST
+                Faces = faces;
             }
 
-            string keywords = GetMetadataFromVideoIndexer(videoIndexerJsonObject, "keywords", "name");
+            string keywords = GetMetadataFromVideoIndexer(videoIndexerJsonObject, "keywords", "text");
             if (keywords.Length > 0)
             {
-                Keywords += sbTextVector.ToString();
+                Keywords = keywords;
             }
 
             string ocr = GetMetadataFromVideoIndexer(videoIndexerJsonObject, "ocr", "text");
             if (ocr.Length > 0)
             {
-                sbTextVector.Append("OCR: ");
-                sbTextVector.Append(ocr);
+                Ocr = ocr;
             }
 
             string transcript = GetMetadataFromVideoIndexer(videoIndexerJsonObject, "transcript", "text");
             if (transcript.Length > 0)
             {
-                sbTextVector.Append("Transcript: ");
-                sbTextVector.Append(transcript);
+                Transcript = transcript;
             }
         }
 

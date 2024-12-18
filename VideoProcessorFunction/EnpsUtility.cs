@@ -33,6 +33,11 @@ namespace VideoProcessorFunction
         public string Slug { get; set; }
 
         /// <summary>
+        /// The type of video this is, such as PKG. This will only be something other than PKG if the "force share"
+        /// </summary>
+        public string VideoType { get; set; }
+
+        /// <summary>
         /// The MOS XML field from ENPS
         /// </summary>
         public string MediaObject { get; set; }
@@ -205,25 +210,23 @@ namespace VideoProcessorFunction
                             case "title":
                                 int indexOfDash = fieldValue.IndexOf("-");
 
-                                string type = string.Empty;
-
                                 // there could a type from the producer or small variations in the title, so we need to check that the dash exists
                                 if (indexOfDash != -1)
                                 {
                                     Slug = fieldValue.Substring(0, indexOfDash);
-                                    type = fieldValue.Substring(indexOfDash + 1, fieldValue.Length - (indexOfDash + 1));
+                                    VideoType = fieldValue.Substring(indexOfDash + 1, fieldValue.Length - (indexOfDash + 1));
                                 }
                                 else
                                 {
                                     Slug = fieldValue;
                                 }
 
-                                if (type.Equals("PKG"))
+                                if (VideoType.Equals("PKG"))
                                 {
                                     isPkg = true;
                                 }
 
-                                log.LogInformation($"Slug: {Slug} (of type {type})");
+                                log.LogInformation($"Slug: {Slug} (of type {VideoType})");
 
                                 break;
                         }

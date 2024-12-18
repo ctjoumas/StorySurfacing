@@ -16,9 +16,16 @@ namespace VideoProcessorFunction.Models
         public List<string> Topics { get; set; }
 
         /// <summary>
+        /// The type of video this is, such as PKG. This will only be something other than PKG if the "force share"
+        /// checkbox is checked on ENPS by the producer.
+        /// </summary>
+        public string EnpsVideoType { get;set; }
+
+        /// <summary>
         /// Slug of the story/video, which we get from ENPS
         /// </summary>
         public string EnpsSlug { get; set; }
+
         /// <summary>
         /// XML details from ENPS
         /// </summary>
