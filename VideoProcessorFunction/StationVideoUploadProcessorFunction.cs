@@ -9,7 +9,6 @@ using System.Xml;
 using System.Security.Cryptography;
 using System.Text;
 using System.Globalization;
-using CoreFtp;
 using VideoProcessorFunction.Models;
 using VideoProcessorFunction.Services;
 using Newtonsoft.Json;
@@ -672,9 +671,7 @@ namespace VideoProcessorFunction
                 await UpdateStationTopics(videoId, videoName, topics.Trim());
             }
 
-            string keywords = videoIndexerResourceProviderClient.Keywords;
-            //string mosXml = "<mos><itemID>2</itemID><itemSlug>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</itemSlug><objID>fae8d129-2374-4aa3-bfa0-51532fbc076c</objID><mosID>BC.PRECIS2.WESH.HEARST.MOS</mosID><mosAbstract>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</mosAbstract><abstract>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</abstract><objDur>5580</objDur><objTB>60</objTB><objSlug>UAW STRIKE-PKG_WESH-NEWS-WSE1X_drobinson02_20230918_104756.mxf</objSlug><objType>VIDEO</objType><objPaths><objPath>https://WESH-CONT1.companynet.org:10456/broadcast/fae8d129-2374-4aa3-bfa0-51532fbc076c.mxf</objPath><objProxyPath techDescription=\"Proxy\">https://WESH-CONT1.companynet.org:10456/proxy/fae8d129-2374-4aa3-bfa0-51532fbc076cProxy.mp4</objProxyPath><objProxyPath techDescription=\"JPG\">https://WESH-CONT1.companynet.org:10456/still/fae8d129-2374-4aa3-bfa0-51532fbc076c.jpg</objProxyPath></objPaths><mosExternalMetadata><mosScope>STORY</mosScope><mosSchema>http://bitcentral.com/schemas/mos/2.0</mosSchema><mosPayload /></mosExternalMetadata><itemChannel>X</itemChannel><objAir>NOT READY</objAir></mos>";
-            //string videoTimestamp = DateTime.Now.ToString();
+            var keywords = videoIndexerResourceProviderClient.Keywords;
             await CreateEnpsXmlDocument(story.EnpsHearstShare, stationName, topics, keywords, story.EnpsSlug, story.EnpsMediaObject, stationName, story.EnpsFromPerson, story.EnpsVideoTimestamp);
         }
 
@@ -713,7 +710,7 @@ namespace VideoProcessorFunction
 
             // Message ID needs to be 7 characters, so generate SHA256 and truncate it. We'll base this
             // off of the slug
-            string messageId = string.Empty;
+            var messageId = string.Empty;
             using (SHA256 sha256 = SHA256.Create())
             {
                 byte[] hashBytes = sha256.ComputeHash(Encoding.UTF8.GetBytes(slug));
@@ -773,7 +770,7 @@ namespace VideoProcessorFunction
             rootNode.AppendChild(newNode);
 
             // AI topic comparison to each station AI index
-            string ofInterestToStations = string.Empty;            
+            var ofInterestToStations = string.Empty;            
             if (!forceShare)
             {
                 _logger.LogInformation($"Getting station topics for station {stationName}");
@@ -787,9 +784,6 @@ namespace VideoProcessorFunction
                     var response = await azureOpenAIService.MatchStationsToVideoTopicsAsync(allStationTopics, topics);
                     _logger.LogInformation($"Matched stations to video topics for station {stationName}. Response: {response}");
 
-                    // The response will come back from the LLM as the following JSON:
-                    // { "interestedStations":["WESH", "WMUR", "KCRA"]}
-                    // Deserialize the JSON string into a dictionary
                     var jsonObject = JsonConvert.DeserializeObject<Dictionary<string, List<string>>>(response);
 
                     // extract the interestedStations array
@@ -813,23 +807,7 @@ namespace VideoProcessorFunction
             rootNode.AppendChild(newNode);
 
             _logger.LogInformation($"End creating Hearst XML for station {stationName}");
-            using (MemoryStream xmlStream = new MemoryStream())
-            {
-                using (var ftpClient = new FtpClient(new FtpClientConfiguration
-                {
-                    Host = "bncftp.ap.org",
-                    Username = "hearst-test",
-                    Password = "Fried^Pickle^Chips97",
-                    IgnoreCertificateErrors = true
-
-                }))
-                {
-                    await ftpClient.LoginAsync();
-                    using var writeStream = await ftpClient.OpenFileWriteStreamAsync($"{messageId}.xml");
-                    doc.Save(writeStream);
-                    _logger.LogInformation($"XML document {messageId}.xml uploaded to FTP server");
-                }
-            }
+            await UplodadEnpsXmlToAzureStorageAsync(doc, stationName, messageId);
         }
 
         static string CreateQueryString(IDictionary<string, string> parameters)
@@ -892,6 +870,24 @@ namespace VideoProcessorFunction
             var blobClient = new BlobClient(connectionString, containerName, name);
             var properties = await blobClient.GetPropertiesAsync();
             return properties;
+        }
+
+        private async Task UplodadEnpsXmlToAzureStorageAsync(
+            XmlDocument xmlDocument, 
+            string containerName, 
+            string xmlFileName)
+        {
+            var blobName = $"WiresXml/{xmlFileName}.xml";
+            _logger.LogInformation($"Uploading ENPS XML File to Azure: {containerName}/{blobName}");
+         
+            var blobClient = new BlobClient(StorageAccountConnectionString, containerName, blobName);
+
+            using var memoryStream = new MemoryStream();
+            xmlDocument.Save(memoryStream);
+            memoryStream.Position = 0;
+
+            await blobClient.UploadAsync(memoryStream, overwrite: true);
+            _logger.LogInformation($"End uploading ENPS XML File to Azure: {containerName}/{blobName}");
         }
     }
 }
