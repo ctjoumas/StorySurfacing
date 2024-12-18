@@ -178,6 +178,7 @@ namespace VideoProcessorFunction
                 VideoName = videoName,
                 Topics = new List<string> { "", "", "" },
                 VideoId = videoId,
+                EnpsVideoType = enpsUtility.VideoType,
                 StoryDateTime = enpsUtility.StoryDateTime,
                 EnpsVideoTimestamp = enpsUtility.VideoTimestamp,
                 EnpsSlug = enpsUtility.Slug,
@@ -396,6 +397,7 @@ namespace VideoProcessorFunction
                         VideoId = videoId,
                         PartitionKey = stationName,
                         VideoName = name,
+                        EnpsVideoType = enpsUtility.VideoType,
                         StoryDateTime = enpsUtility.StoryDateTime,
                         EnpsSlug = enpsUtility.Slug,
                         EnpsMediaObject = enpsUtility.MediaObject,
@@ -671,8 +673,9 @@ namespace VideoProcessorFunction
                 await UpdateStationTopics(videoId, videoName, topics.Trim());
             }
 
-            var keywords = videoIndexerResourceProviderClient.Keywords;
-            await CreateEnpsXmlDocument(story.EnpsHearstShare, stationName, topics, keywords, story.EnpsSlug, story.EnpsMediaObject, stationName, story.EnpsFromPerson, story.EnpsVideoTimestamp);
+            string faces = videoIndexerResourceProviderClient.Faces;
+            string keywords = videoIndexerResourceProviderClient.Keywords;
+            await CreateEnpsXmlDocument(story.EnpsHearstShare, stationName, story.EnpsVideoType, topics, faces, keywords, story.EnpsSlug, story.EnpsMediaObject, stationName, story.EnpsFromPerson, story.EnpsVideoTimestamp);
         }
 
         /// <summary>
@@ -693,8 +696,10 @@ namespace VideoProcessorFunction
         /// </summary>
         private async Task CreateEnpsXmlDocument(
             bool forceShare, 
-            string stationName, 
-            string topics, 
+            string stationName,
+            string videoType,
+            string topics,
+            string faces,
             string keywords, 
             string slug, 
             string mosXml, 
@@ -736,10 +741,9 @@ namespace VideoProcessorFunction
             newNode.InnerXml = mosXml;
             rootNode.AppendChild(newNode);
 
-            // TODO: If HearstShare is true, this may not be a PKG so we may need to add the type to Cosmos when video is first uploaded
             // if we need this, this might be in the title case of the EnpsUtility
             newNode = doc.CreateElement("videoGenre");
-            newNode.InnerText = "PKG";
+            newNode.InnerText = videoType;
             rootNode.AppendChild(newNode);
 
             newNode = doc.CreateElement("fromStation");
@@ -849,9 +853,7 @@ namespace VideoProcessorFunction
 
         static async Task UpdateStationTopics(string videoId, string videoName, string topics)
         {
-            var topicsPart = topics.Split(':')[1].Trim();
-
-            List<string> topicsList = topicsPart.Split('|')
+            List<string> topicsList = topics.Split('|')
                                                 .Select(topic => topic.Trim())
                                                 .Where(topic => !string.IsNullOrEmpty(topic))
                                                 .ToList();
