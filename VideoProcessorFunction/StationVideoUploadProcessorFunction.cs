@@ -390,7 +390,7 @@ namespace VideoProcessorFunction
                     var videoId = await ProcessBlobTrigger(name, stationName, _logger);
 
                     var cosmosDbService = new CosmosDbService<Story>();
-
+                    
                     var story = new Story
                     {
                         Id = Guid.NewGuid().ToString(),
@@ -651,6 +651,9 @@ namespace VideoProcessorFunction
                 //var possibleNetworkAffiliation = await azureOpenAIService.SearchNetworkAffiliationAsync(story.VideoOverviewText);
             }
 
+            // TODO: Get video transcript summary by calling SummarizeTranscriptAsync in the AzureOpenAIService
+            var videoTranscriptSummary = string.Empty;
+
             var stationName = story.PartitionKey;
 
             // once the video is processed, we no longer need it in the storage account - TODO: ADD CONTAINER NAME FOR VIDEOS TO APP CONFIG
@@ -664,7 +667,7 @@ namespace VideoProcessorFunction
 
             // Now that we have the full JSON from Video Indexer, extract the topics and keywords for the XML file
             videoIndexerResourceProviderClient.ProcessMetadata(videoGetIndexResult, _logger);
-          
+
             // create the XML document that will feed back into ENPS
             string topics = videoIndexerResourceProviderClient.Topics;
 
@@ -675,7 +678,7 @@ namespace VideoProcessorFunction
 
             string faces = videoIndexerResourceProviderClient.Faces;
             string keywords = videoIndexerResourceProviderClient.Keywords;
-            await CreateEnpsXmlDocument(story.EnpsHearstShare, stationName, story.EnpsVideoType, topics, faces, keywords, story.EnpsSlug, story.EnpsMediaObject, stationName, story.EnpsFromPerson, story.EnpsVideoTimestamp);
+            await CreateEnpsXmlDocument(story.EnpsHearstShare, stationName, story.EnpsVideoType, topics, faces, keywords, story.EnpsSlug, story.EnpsMediaObject, stationName, story.EnpsFromPerson, story.EnpsVideoTimestamp, story.VideoOverviewText, videoIndexerResourceProviderClient.Transcript, videoTranscriptSummary);
         }
 
         /// <summary>
@@ -705,7 +708,10 @@ namespace VideoProcessorFunction
             string mosXml, 
             string fromStation, 
             string fromPerson, 
-            string videoTimestamp)
+            string videoTimestamp,
+            string videoOverviewText, 
+            string videoTranscript, 
+            string videoTranscriptSummary)
         {
             _logger.LogInformation($"Creating Hearst XML for station {stationName}");
             XmlDocument doc = new XmlDocument();
