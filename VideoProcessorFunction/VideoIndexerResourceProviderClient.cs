@@ -149,7 +149,6 @@ namespace VideoProcessorFunction
             string faces = GetMetadataFromVideoIndexer(videoIndexerJsonObject, "faces", "name");
             if (faces.Length > 0)
             {
-                // remove Unknown faces (?) - TEST
                 Faces = faces;
             }
 

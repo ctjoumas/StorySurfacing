@@ -184,7 +184,7 @@ namespace VideoProcessorFunction.Services
                         messages = new[]
                         {
                         new { role = "system", content = "You are a news outlet AI assistant that identifies the network a person works for." },
-                        new { role = "user", content = $"Find a person's name in this text. The network this person works for is not in the text so please find out which network this person works for and respond with only that network: {videoText}" }
+                        new { role = "user", content = $"Find a person's name in the supplied Video Text. The network this person works for is not in the text so please find out which network this person works for and respond with only that network. If you do not find a name in the text or you do not find a possibly affiliated network with any name you find, you must repsond with only 'None Detected'. Video Text:{videoText}" }
                         },
                         max_tokens = 4096,  // Define the maximum number of tokens
                         temperature = 0.7,  // Optional, controls randomness of the response
@@ -220,7 +220,12 @@ namespace VideoProcessorFunction.Services
             }
         }
 
-        public async Task<string> SummarizeTranscriptAsync(string videoText)
+        /// <summary>
+        /// Uses the LLM to summarize a video transcript from Video Indexer into a few sentences.
+        /// </summary>
+        /// <param name="videoTranscript"></param>
+        /// <returns></returns>
+        public async Task<string> SummarizeTranscriptAsync(string videoTranscript)
         {
             // Ensure semaphore is in place for controlling concurrency
             await semaphore.WaitAsync();
@@ -239,7 +244,7 @@ namespace VideoProcessorFunction.Services
                         messages = new[]
                         {
                         new { role = "system", content = "You are a news outlet AI assistant that summarizes video transcripts." },
-                        new { role = "user", content = $"Please summarize the following video transcript into a few sentences. Your summary should be as detailed as possible while strictly reflecting only the information provided in the transcript. Do not include any additional information or assumptions that are not stated in the transcript: {videoText}" }
+                        new { role = "user", content = $"Please summarize the following video transcript into a few sentences. Your summary should be as detailed as possible while strictly reflecting only the information provided in the transcript. Do not include any additional information or assumptions that are not stated in the transcript: {videoTranscript}" }
                         },
                         max_tokens = 4096,  // Define the maximum number of tokens
                         temperature = 0.7,  // Optional, controls randomness of the response
