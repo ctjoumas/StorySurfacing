@@ -390,7 +390,7 @@ namespace VideoProcessorFunction
                     var videoId = await ProcessBlobTrigger(name, stationName, _logger);
 
                     var cosmosDbService = new CosmosDbService<Story>();
-
+                    
                     var story = new Story
                     {
                         Id = Guid.NewGuid().ToString(),
@@ -644,11 +644,13 @@ namespace VideoProcessorFunction
 
             _logger.LogInformation($"Here is the full JSON of the indexed video for video ID {videoId}: \n{videoGetIndexResult}");
 
+            // create the AOAI instance for the possible network afilliation as well as the transcript summary
+            var azureOpenAIService = new AzureOpenAIService(_logger);
+            var possibleNetworkAffiliation = string.Empty;
             if (!string.IsNullOrWhiteSpace(story.VideoOverviewText))
             {
                 // ask GPT-4 to see if a name is embedded in the video overview text and return any network affiliation
-                //var azureOpenAIService = new AzureOpenAIService();
-                //var possibleNetworkAffiliation = await azureOpenAIService.SearchNetworkAffiliationAsync(story.VideoOverviewText);
+                possibleNetworkAffiliation = await azureOpenAIService.SearchNetworkAffiliationAsync(story.VideoOverviewText);
             }
 
             var stationName = story.PartitionKey;
@@ -664,7 +666,10 @@ namespace VideoProcessorFunction
 
             // Now that we have the full JSON from Video Indexer, extract the topics and keywords for the XML file
             videoIndexerResourceProviderClient.ProcessMetadata(videoGetIndexResult, _logger);
-          
+
+            // Get video transcript summary using Azure OpenAI
+            var videoTranscriptSummary = await azureOpenAIService.SummarizeTranscriptAsync(videoIndexerResourceProviderClient.Transcript);
+
             // create the XML document that will feed back into ENPS
             string topics = videoIndexerResourceProviderClient.Topics;
 
@@ -675,7 +680,7 @@ namespace VideoProcessorFunction
 
             string faces = videoIndexerResourceProviderClient.Faces;
             string keywords = videoIndexerResourceProviderClient.Keywords;
-            await CreateEnpsXmlDocument(story.EnpsHearstShare, stationName, story.EnpsVideoType, topics, faces, keywords, story.EnpsSlug, story.EnpsMediaObject, stationName, story.EnpsFromPerson, story.EnpsVideoTimestamp);
+            await CreateEnpsXmlDocument(story.EnpsHearstShare, stationName, story.EnpsVideoType, topics, faces, keywords, story.EnpsSlug, story.EnpsMediaObject, stationName, story.EnpsFromPerson, story.EnpsVideoTimestamp, possibleNetworkAffiliation , story.VideoOverviewText, videoIndexerResourceProviderClient.Transcript, videoTranscriptSummary);
         }
 
         /// <summary>
@@ -705,7 +710,11 @@ namespace VideoProcessorFunction
             string mosXml, 
             string fromStation, 
             string fromPerson, 
-            string videoTimestamp)
+            string videoTimestamp,
+            string possibleNetworkAffiliation,
+            string videoOverviewText, 
+            string videoTranscript, 
+            string videoTranscriptSummary)
         {
             _logger.LogInformation($"Creating Hearst XML for station {stationName}");
             XmlDocument doc = new XmlDocument();
@@ -769,8 +778,28 @@ namespace VideoProcessorFunction
             newNode.InnerText = topics;
             rootNode.AppendChild(newNode);
 
+            newNode = doc.CreateElement("faces");
+            newNode.InnerText = faces;
+            rootNode.AppendChild(newNode);
+
             newNode = doc.CreateElement("keywords");
             newNode.InnerText = keywords;
+            rootNode.AppendChild(newNode);
+
+            newNode = doc.CreateElement("enpsStory");
+            newNode.InnerText = videoOverviewText;
+            rootNode.AppendChild(newNode);
+
+            newNode = doc.CreateElement("possibleNetworkAffiliation");
+            newNode.InnerText = possibleNetworkAffiliation;
+            rootNode.AppendChild(newNode);
+
+            newNode = doc.CreateElement("videoTranscript");
+            newNode.InnerText = videoTranscript;
+            rootNode.AppendChild(newNode);
+
+            newNode = doc.CreateElement("videoSummary");
+            newNode.InnerText = videoTranscriptSummary;
             rootNode.AppendChild(newNode);
 
             // AI topic comparison to each station AI index

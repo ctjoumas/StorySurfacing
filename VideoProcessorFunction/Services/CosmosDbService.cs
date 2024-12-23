@@ -20,6 +20,7 @@ namespace VideoProcessorFunction.Services
         private static string CosmosContainerName = Environment.GetEnvironmentVariable("CosmosContainerName");
         private static string CosmosAccountUri = Environment.GetEnvironmentVariable("CosmosAccountUri");
         private static string TenantId = Environment.GetEnvironmentVariable("TenantId");
+        private static string TopicsTimeframeThreshold = Environment.GetEnvironmentVariable("TopicsTimeframeThreshold");
 
         public CosmosDbService()
         {
@@ -114,9 +115,16 @@ namespace VideoProcessorFunction.Services
 
         public async Task<IEnumerable<T>> GetStationTopicsAsync(string excludedStation = null)
         {
+            // We only want to pull topics from stations from the past x number of days, as specified in
+            // the TopicsTimeframeThreshold environment variable
+            var intThresholdTimeframe = int.Parse(TopicsTimeframeThreshold);
+            TimeZoneInfo easternZone = TimeZoneInfo.FindSystemTimeZoneById("Eastern Standard Time");
+
+            // get the current time minus the specified threshold in EST
+            DateTime thresholdDate = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow.AddDays(-intThresholdTimeframe), easternZone);
             var query = string.IsNullOrEmpty(excludedStation)
-                ? "SELECT * FROM c WHERE ARRAY_LENGTH(c.Topics) > 0"
-                : "SELECT * FROM c WHERE c.StationName != @excludedStation AND ARRAY_LENGTH(c.Topics) > 0";
+                ? $"SELECT * FROM c WHERE ARRAY_LENGTH(c.Topics) > 0 and c.EnpsVideoTimestamp >= '{thresholdDate}'"
+                : $"SELECT * FROM c WHERE c.StationName != @excludedStation AND ARRAY_LENGTH(c.Topics) > 0 and c.EnpsVideoTimestamp >= '{thresholdDate}'";
 
             var queryDefinition = new QueryDefinition(query);
 

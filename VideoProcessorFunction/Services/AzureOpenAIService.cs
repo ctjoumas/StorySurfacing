@@ -184,7 +184,67 @@ namespace VideoProcessorFunction.Services
                         messages = new[]
                         {
                         new { role = "system", content = "You are a news outlet AI assistant that identifies the network a person works for." },
-                        new { role = "user", content = $"Find a person's name in this text. The network this person works for is not in the text so please find out which network this person works for and respond with only that network: {videoText}" }
+                        new { role = "user", content = $"Find a person's name in the supplied Video Text. The network this person works for is not in the text so please find out which network this person works for and respond with only that network. If you do not find a name in the text or you do not find a possibly affiliated network with any name you find, you must repsond with only 'None Detected'. Video Text:{videoText}" }
+                        },
+                        max_tokens = 4096,  // Define the maximum number of tokens
+                        temperature = 0.7,  // Optional, controls randomness of the response
+                    };
+
+                    // Serialize the payload to JSON
+                    var jsonPayload = JsonConvert.SerializeObject(requestPayload);
+
+                    var content = new StringContent(jsonPayload, Encoding.UTF8, "application/json");
+
+                    // Send POST request
+                    var response = await client.PostAsync(_azureOpenAIUrl, content);
+
+                    return response;
+                });
+
+                // Get the response content
+                var responseContent = await httpResponse.Content.ReadAsStringAsync();
+
+                // Parse the JSON response
+                JObject jsonResponse = JObject.Parse(responseContent);
+
+                // Extract the content from the message inside choices[0]
+                //string possibleNetworkAffiliatoin = completions.Choices != null ? completions.Choices[0].Message.Content : "Unknown network affiliation";
+                var messageContent = jsonResponse["choices"]?[0]?["message"]?["content"]?.ToString();
+
+                return messageContent;
+            }
+            finally
+            {
+                // Release the semaphore once the request is complete
+                semaphore.Release();
+            }
+        }
+
+        /// <summary>
+        /// Uses the LLM to summarize a video transcript from Video Indexer into a few sentences.
+        /// </summary>
+        /// <param name="videoTranscript"></param>
+        /// <returns></returns>
+        public async Task<string> SummarizeTranscriptAsync(string videoTranscript)
+        {
+            // Ensure semaphore is in place for controlling concurrency
+            await semaphore.WaitAsync();
+
+            try
+            {
+                // Wrap the API call with the retry policy to handle transient errors
+                var httpResponse = await retryPolicy.ExecuteAsync(async () =>
+                {
+                    using HttpClient client = new HttpClient();
+                    client.DefaultRequestHeaders.Add("api-key", _apiKey);
+
+                    // Define the request payload for a chat completion
+                    var requestPayload = new
+                    {
+                        messages = new[]
+                        {
+                        new { role = "system", content = "You are a news outlet AI assistant that summarizes video transcripts." },
+                        new { role = "user", content = $"Please summarize the following video transcript into a few sentences. Your summary should be as detailed as possible while strictly reflecting only the information provided in the transcript. Do not include any additional information or assumptions that are not stated in the transcript: {videoTranscript}" }
                         },
                         max_tokens = 4096,  // Define the maximum number of tokens
                         temperature = 0.7,  // Optional, controls randomness of the response
