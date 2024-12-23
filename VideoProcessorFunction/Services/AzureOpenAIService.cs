@@ -56,6 +56,8 @@ namespace VideoProcessorFunction.Services
         Only return properly structured JSON as the response.
         ";
 
+
+
         private readonly string _azureOpenAIUrl;
         private readonly string _apiKey;
         private readonly ILogger _logger;
@@ -183,8 +185,8 @@ namespace VideoProcessorFunction.Services
                     {
                         messages = new[]
                         {
-                        new { role = "system", content = "You are a news outlet AI assistant that identifies the network a person works for." },
-                        new { role = "user", content = $"Find a person's name in the supplied Video Text. The network this person works for is not in the text so please find out which network this person works for and respond with only that network. If you do not find a name in the text or you do not find a possibly affiliated network with any name you find, you must repsond with only 'None Detected'. Video Text:{videoText}" }
+                            new { role = "system", content = "You are a news outlet AI assistant that identifies the network an anchor works for." },
+                            new { role = "user", content = $"Identify the anchor mentioned in the video text and the network they are affiliated with. If no network is mentioned in the text, do some research and respond with the network they work for. If the anchor's name is found in the video text, please also identify which network they work for, even if it's not mentioned directly in the text. Please also identify the network the anchor is affiliated with, even if the network is not mentioned. Use your knowledge to find the network they work for. Video Text: {videoText}" }
                         },
                         max_tokens = 4096,  // Define the maximum number of tokens
                         temperature = 0.7,  // Optional, controls randomness of the response
