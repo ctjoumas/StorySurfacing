@@ -848,7 +848,7 @@ namespace VideoProcessorFunction
             rootNode.AppendChild(newNode);
 
             _logger.LogInformation($"End creating Hearst XML for station {stationName}");
-            await UplodadEnpsXmlToAzureStorageAsync(doc, stationName, messageId);
+            await UploadEnpsXmlToAzureStorageAsync(doc, messageId);
         }
 
         static string CreateQueryString(IDictionary<string, string> parameters)
@@ -911,22 +911,23 @@ namespace VideoProcessorFunction
             return properties;
         }
 
-        private async Task UplodadEnpsXmlToAzureStorageAsync(
-            XmlDocument xmlDocument, 
-            string containerName, 
+        private async Task UploadEnpsXmlToAzureStorageAsync(
+            XmlDocument xmlDocument,
             string xmlFileName)
         {
-            var blobName = $"WiresXml/{xmlFileName}.xml";
-            _logger.LogInformation($"Uploading ENPS XML File to Azure: {containerName}/{blobName}");
+            string wiresContainerName = Environment.GetEnvironmentVariable("WiresContainer");
+
+            var blobName = $"{xmlFileName}.xml";
+            _logger.LogInformation($"Uploading ENPS XML File to Azure: {wiresContainerName}/{blobName}");
          
-            var blobClient = new BlobClient(StorageAccountConnectionString, containerName, blobName);
+            var blobClient = new BlobClient(StorageAccountConnectionString, wiresContainerName, blobName);
 
             using var memoryStream = new MemoryStream();
             xmlDocument.Save(memoryStream);
             memoryStream.Position = 0;
 
             await blobClient.UploadAsync(memoryStream, overwrite: true);
-            _logger.LogInformation($"End uploading ENPS XML File to Azure: {containerName}/{blobName}");
+            _logger.LogInformation($"End uploading ENPS XML File to Azure: {wiresContainerName}/{blobName}");
         }
 
         private async Task DeleteBlobAsync(string name, string stationName)
