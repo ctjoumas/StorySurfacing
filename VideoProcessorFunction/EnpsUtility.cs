@@ -219,6 +219,7 @@ namespace VideoProcessorFunction
                                 else
                                 {
                                     Slug = fieldValue;
+                                    VideoType = string.Empty;
                                 }
 
                                 if (VideoType.Equals("PKG"))

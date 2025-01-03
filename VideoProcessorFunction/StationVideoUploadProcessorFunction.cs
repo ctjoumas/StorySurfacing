@@ -382,6 +382,15 @@ namespace VideoProcessorFunction
                 if (!forceShare && (blobCreatedDateTimeEst < currentTimeMinusTenMinutesEst))
                 {
                     _logger.LogInformation($"Blob trigger function for Station A SKIPPING blob\n Name: {name} because it was uploaded more than {TIME_THRESHOLD} minutes ago.");
+
+                    // Delete the blob from the storage account
+                    BlobClient blobClient = new BlobClient(StorageAccountConnectionString, stationName, name);
+                    if (blobClient.Exists())
+                    {
+                        await blobClient.DeleteAsync();
+
+                        _logger.LogInformation($"Video {name} deleted from storage account.");
+                    }
                 }
                 else
                 {
@@ -408,6 +417,17 @@ namespace VideoProcessorFunction
 
                     _logger.LogInformation($"Creating item in Cosmos DB for video {name} from station {stationName}");
                     await cosmosDbService.CreateItemAsync(story);
+                }
+            }
+            else
+            {
+                // if the blob is not a PKG, we'll fall through here, so we want to delete the blob from the storage account
+                BlobClient blobClient = new BlobClient(StorageAccountConnectionString, stationName, name);
+                if (blobClient.Exists())
+                {
+                    await blobClient.DeleteAsync();
+
+                    _logger.LogInformation($"Video {name} deleted from storage account.");
                 }
             }
         }
