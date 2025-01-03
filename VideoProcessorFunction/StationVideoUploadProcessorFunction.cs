@@ -384,13 +384,7 @@ namespace VideoProcessorFunction
                     _logger.LogInformation($"Blob trigger function for Station A SKIPPING blob\n Name: {name} because it was uploaded more than {TIME_THRESHOLD} minutes ago.");
 
                     // Delete the blob from the storage account
-                    BlobClient blobClient = new BlobClient(StorageAccountConnectionString, stationName, name);
-                    if (blobClient.Exists())
-                    {
-                        await blobClient.DeleteAsync();
-
-                        _logger.LogInformation($"Video {name} deleted from storage account.");
-                    }
+                    await DeleteBlobAsync(name, stationName);
                 }
                 else
                 {
@@ -422,13 +416,7 @@ namespace VideoProcessorFunction
             else
             {
                 // if the blob is not a PKG, we'll fall through here, so we want to delete the blob from the storage account
-                BlobClient blobClient = new BlobClient(StorageAccountConnectionString, stationName, name);
-                if (blobClient.Exists())
-                {
-                    await blobClient.DeleteAsync();
-
-                    _logger.LogInformation($"Video {name} deleted from storage account.");
-                }
+                await DeleteBlobAsync(name, stationName);
             }
         }
 
@@ -939,6 +927,17 @@ namespace VideoProcessorFunction
 
             await blobClient.UploadAsync(memoryStream, overwrite: true);
             _logger.LogInformation($"End uploading ENPS XML File to Azure: {containerName}/{blobName}");
+        }
+
+        private async Task DeleteBlobAsync(string name, string stationName)
+        {
+            var blobClient = new BlobClient(StorageAccountConnectionString, stationName, name);
+            if (blobClient.Exists())
+            {
+                await blobClient.DeleteAsync();
+
+                _logger.LogInformation($"Video {name} deleted from storage account.");
+            }
         }
     }
 }
