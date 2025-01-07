@@ -246,7 +246,7 @@ namespace VideoProcessorFunction.Services
                         messages = new[]
                         {
                         new { role = "system", content = "You are a news outlet AI assistant that summarizes video transcripts." },
-                        new { role = "user", content = $"Please summarize the following video transcript into a few sentences. Your summary should be as detailed as possible while strictly reflecting only the information provided in the transcript. Do not include any additional information or assumptions that are not stated in the transcript: {videoTranscript}" }
+                        new { role = "user", content = $"Please summarize the following video transcript into a two sentences. It is important to keep the summary only to two sentences. Your summary should be as detailed as possible while strictly reflecting only the information provided in the transcript. Do not include any additional information or assumptions that are not stated in the transcript: {videoTranscript}" }
                         },
                         max_tokens = 4096,  // Define the maximum number of tokens
                         temperature = 0.7,  // Optional, controls randomness of the response
