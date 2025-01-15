@@ -411,6 +411,9 @@ namespace VideoProcessorFunction
 
                     _logger.LogInformation($"Creating item in Cosmos DB for video {name} from station {stationName}");
                     await cosmosDbService.CreateItemAsync(story);
+
+                    // We will delete the blob from the storage account after processing it.
+                    await DeleteBlobAsync(name, stationName);
                 }
             }
             else
@@ -662,15 +665,6 @@ namespace VideoProcessorFunction
             }
 
             var stationName = story.PartitionKey;
-
-            // once the video is processed, we no longer need it in the storage account - TODO: ADD CONTAINER NAME FOR VIDEOS TO APP CONFIG
-            BlobClient blobClient = new BlobClient(StorageAccountConnectionString, stationName, videoName);
-            if (blobClient.Exists())
-            {
-                await blobClient.DeleteAsync();
-
-                _logger.LogInformation($"Video {videoName} deleted from storage account.");
-            }            
 
             // Now that we have the full JSON from Video Indexer, extract the topics and keywords for the XML file
             videoIndexerResourceProviderClient.ProcessMetadata(videoGetIndexResult, _logger);
